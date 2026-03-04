@@ -101,7 +101,7 @@ while ($listener.IsListening) {
             $reader.Dispose()
 
             $json = $body | ConvertFrom-Json
-            $scriptName = [string]$json.script
+            $scriptName = ([string]$json.script).Trim()
 
             # Lista de scripts permitidos por seguranca
             $allowedScripts = @(
@@ -116,7 +116,10 @@ while ($listener.IsListening) {
             if ($allowedScripts -contains $scriptName) {
                 $possiblePaths = @(
                     (Join-Path $scriptRoot $scriptName),
-                    (Join-Path $projectRoot $scriptName)
+                    (Join-Path $projectRoot $scriptName),
+                    (Join-Path (Join-Path $projectRoot "Logs") $scriptName),
+                    (Join-Path (Get-Location).Path $scriptName),
+                    (Join-Path (Join-Path (Get-Location).Path "Logs") $scriptName)
                 )
                 $targetScript = $possiblePaths | Where-Object { Test-Path $_ } | Select-Object -First 1
             } else {
@@ -135,7 +138,17 @@ while ($listener.IsListening) {
                 $content = (@{ status = "success"; message = "Script iniciado em background." } | ConvertTo-Json -Compress)
                 $contentType = "application/json; charset=utf-8"
             } else {
-                $content = (@{ status = "error"; message = "Script nao permitido ou nao encontrado." } | ConvertTo-Json -Compress)
+                $debugPaths = @(
+                    (Join-Path $scriptRoot $scriptName),
+                    (Join-Path $projectRoot $scriptName),
+                    (Join-Path (Join-Path $projectRoot "Logs") $scriptName)
+                ) -join " | "
+                $content = (@{
+                    status = "error"
+                    message = "Script nao permitido ou nao encontrado."
+                    script = $scriptName
+                    searched = $debugPaths
+                } | ConvertTo-Json -Compress)
                 $statusCode = 404
                 $contentType = "application/json; charset=utf-8"
             }
@@ -148,6 +161,12 @@ while ($listener.IsListening) {
 
             if ($null -ne $logFile) {
                 $logContent = Get-Content -Path $logFile.FullName -Raw -Encoding UTF8
+                if ($logContent -is [System.Array]) {
+                    $logContent = ($logContent -join "`n")
+                }
+                if ($logContent -isnot [string]) {
+                    $logContent = [string]$logContent
+                }
                 $content = (@{ log = $logContent } | ConvertTo-Json -Compress)
             } else {
                 $content = (@{ log = "Nenhum log encontrado." } | ConvertTo-Json -Compress)

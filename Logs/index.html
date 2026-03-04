@@ -121,7 +121,11 @@
             try {
                 const response = await fetch('/api/logs');
                 const data = await parseJsonSafe(response);
-                document.getElementById('log-container').innerText = data.log || 'Nenhum log disponivel.';
+                let logText = data.log;
+                if (typeof logText === 'object' && logText !== null) {
+                    logText = logText.value || JSON.stringify(logText, null, 2);
+                }
+                document.getElementById('log-container').innerText = logText || 'Nenhum log disponivel.';
             } catch (error) {
                 document.getElementById('log-container').innerText = `Erro ao buscar logs: ${error}`;
             }

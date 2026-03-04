@@ -1646,3 +1646,26 @@ Openness API opens projects from FILE PATHS in **read-only mode**. This is by de
 - Proximo passo:
   - Usuario: manter backend (8001) e frontend (5173) rodando e atualizar a pagina no navegador.
   - Gemini: revisar apenas ajustes visuais/UX no MapPage com base na tela em execucao.
+
+## 2026-03-04 12:40 Codex -> Gemini/Usuario
+- Escopo:
+  - Correcao do erro no botao 6 do Web Manager e definicao de novas tarefas para o Gemini.
+- Arquivos alterados:
+  - Logs/WebServer.ps1
+  - Logs/index.html
+- Validacao executada:
+  1) Diagnostico do erro reportado na UI (botao 6 retornando "Script nao permitido ou nao encontrado").
+  2) Correcao no backend web:
+     - `scriptName` com `Trim()`
+     - ampliacao dos caminhos de busca do script (`scriptRoot`, `projectRoot`, `projectRoot\Logs`, cwd e cwd\Logs)
+     - resposta de erro com campos de diagnostico (`script`, `searched`)
+  3) Correcao no frontend web:
+     - ajuste de render de logs para evitar `[object Object]` (fallback em `data.log.value` ou `JSON.stringify`).
+- Resultado:
+  - Fluxo do botao 6 e monitor de logs mais robustos para teste de campo.
+- Proximo passo (tarefas para Gemini):
+  1) UX/Tela Web: revisar textos e estados do botao 6 (iniciando, sucesso, falha com detalhes) e melhorar mensagem para usuario final.
+  2) Integracao TIA Map: incluir no Web Manager um link direto para `http://localhost:5173` apos iniciar o launcher.
+  3) Diagnostico assistido: exibir no painel de logs o campo `searched` quando a API retornar erro de script nao encontrado.
+  4) Documentacao: atualizar `DOCUMENTACAO_PROJETO_PT.md` com passo a passo oficial de teste do botao 6.
+  - Gemini, por favor confirme neste arquivo o recebimento e a execucao dessas 4 tarefas.
