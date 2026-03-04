@@ -1,0 +1,197 @@
+﻿<!--
+  Interface Web do projeto TIA.
+  Objetivo: permitir operacao por navegador com logs e mapa Mermaid.
+-->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TIA Portal Web Manager</title>
+    <style>
+        body { font-family: "Segoe UI", sans-serif; background: #f4f6f8; color: #222; max-width: 960px; margin: 0 auto; padding: 24px; }
+        h1 { color: #004669; border-bottom: 2px solid #009999; padding-bottom: 8px; }
+        .card { background: #fff; padding: 18px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,.08); margin-bottom: 16px; }
+        button { display: block; width: 100%; padding: 14px; margin: 10px 0; border: none; border-radius: 8px; font-size: 15px; cursor: pointer; text-align: left; }
+        .btn-export { background: #e3f2fd; color: #0d47a1; border-left: 5px solid #2196f3; }
+        .btn-import { background: #e8f5e9; color: #1b5e20; border-left: 5px solid #4caf50; }
+        .btn-cycle  { background: #fff3e0; color: #e65100; border-left: 5px solid #ff9800; }
+        .btn-doc    { background: #ede7f6; color: #4527a0; border-left: 5px solid #673ab7; }
+        .btn-map    { background: #e0f2f1; color: #004d40; border-left: 5px solid #009688; }
+        .status { font-weight: 700; margin-bottom: 8px; }
+        #log-container { background: #171717; color: #00e676; padding: 14px; border-radius: 8px; min-height: 220px; white-space: pre-wrap; overflow-y: auto; font-family: Consolas, monospace; }
+        .small-btn { width: auto; padding: 8px 12px; background: #e0e0e0; color: #222; display: inline-block; }
+        .modal { display: none; position: fixed; z-index: 999; inset: 0; background: rgba(0,0,0,.45); }
+        .modal-content { background: #fff; width: min(1200px, 92vw); height: min(80vh, 900px); margin: 5vh auto; border-radius: 10px; padding: 14px; overflow: auto; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .close { border: none; background: #efefef; border-radius: 6px; width: auto; padding: 6px 10px; }
+        #mermaidContainer { min-height: 500px; border: 1px solid #eee; border-radius: 8px; padding: 10px; }
+        /* Estilos para controles de zoom */
+        .zoom-controls { position: absolute; bottom: 20px; right: 20px; display: flex; gap: 5px; }
+        .zoom-btn { width: 30px; height: 30px; border-radius: 50%; border: 1px solid #ccc; background: white; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+    </style>
+</head>
+<body>
+    <h1>TIA Portal Web Manager</h1>
+
+    <!-- Painel de comandos -->
+    <div class="card">
+        <div class="status" id="status-text">Status: pronto.</div>
+        <button class="btn-export" onclick="runScript('RunExporterWithAttach.ps1')">1. Exportar Projeto</button>
+        <button class="btn-import" onclick="runScript('Import-New-Blocks.ps1')">2. Importar Blocos</button>
+        <button class="btn-cycle" onclick="runScript('Run-Full-Cycle.ps1')">3. Executar Ciclo Completo</button>
+        <button class="btn-doc" onclick="runScript('Generate-Documentation.ps1')">4. Gerar Documentacao</button>
+        <button class="btn-map" onclick="openStructureMap()">5. Visualizar Estrutura (Mermaid)</button>
+    </div>
+
+    <!-- Painel de logs -->
+    <div class="card">
+        <h3>Monitor de logs (ultima execucao)</h3>
+        <div id="log-container">Aguardando logs...</div>
+        <button class="small-btn" onclick="fetchLogs()">Atualizar logs</button>
+    </div>
+
+    <!-- Modal com o diagrama Mermaid -->
+    <div id="structureModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Mapa de Estrutura do Projeto (Mermaid)</h3>
+                <button class="close" onclick="closeStructureMap()">Fechar</button>
+            </div>
+            <div style="position: relative; height: 100%; overflow: hidden;">
+                <div id="mermaidContainer" style="height: 100%; border: none;">Carregando diagrama...</div>
+                <div class="zoom-controls">
+                    <button class="zoom-btn" onclick="zoomIn()">+</button>
+                    <button class="zoom-btn" onclick="zoomOut()">-</button>
+                    <button class="zoom-btn" onclick="resetZoom()">R</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
+    <script>
+        // Inicializa a biblioteca Mermaid, se carregada.
+        if (window.mermaid) {
+            mermaid.initialize({ startOnLoad: false, securityLevel: 'loose' });
+        }
+
+        // Parser robusto para respostas de API.
+        async function parseJsonSafe(response) {
+            const raw = await response.text();
+            try {
+                return JSON.parse(raw);
+            } catch (e) {
+                throw new Error(`Resposta invalida do servidor (${response.status}): ${raw.slice(0, 240)}`);
+            }
+        }
+
+        // Dispara um script no backend via /api/run.
+        async function runScript(scriptName) {
+            const status = document.getElementById('status-text');
+            status.innerText = `Status: solicitando execucao de ${scriptName}...`;
+            status.style.color = '#1565c0';
+
+            try {
+                const response = await fetch('/api/run', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ script: scriptName })
+                });
+
+                const result = await parseJsonSafe(response);
+                if (result.status === 'success') {
+                    status.innerText = `Status: ${scriptName} iniciado com sucesso.`;
+                    status.style.color = '#2e7d32';
+                    setTimeout(fetchLogs, 1500);
+                } else {
+                    status.innerText = `Erro: ${result.message || 'Falha nao informada.'}`;
+                    status.style.color = '#c62828';
+                }
+            } catch (error) {
+                status.innerText = `Erro de conexao: ${error}`;
+                status.style.color = '#c62828';
+            }
+        }
+
+        // Atualiza o painel com o log mais recente.
+        async function fetchLogs() {
+            try {
+                const response = await fetch('/api/logs');
+                const data = await parseJsonSafe(response);
+                document.getElementById('log-container').innerText = data.log || 'Nenhum log disponivel.';
+            } catch (error) {
+                document.getElementById('log-container').innerText = `Erro ao buscar logs: ${error}`;
+            }
+        }
+
+        let panZoomInstance = null;
+
+        // Abre modal e renderiza o Mermaid vindo da API.
+        async function openStructureMap() {
+            const modal = document.getElementById('structureModal');
+            const container = document.getElementById('mermaidContainer');
+            modal.style.display = 'block';
+            container.innerText = 'Carregando diagrama...';
+
+            try {
+                const response = await fetch('/api/mermaid');
+                const data = await parseJsonSafe(response);
+                const definition = data.diagram || 'graph TD\nA[Sem dados]';
+
+                if (!window.mermaid) {
+                    container.innerText = definition;
+                    return;
+                }
+
+                const id = 'm' + Date.now();
+                const render = await mermaid.render(id, definition);
+                container.innerHTML = render.svg;
+
+                // Inicializa o Pan & Zoom no SVG gerado
+                const svgElement = container.querySelector('svg');
+                if (svgElement) {
+                    svgElement.style.height = '100%'; // Garante que o SVG ocupe o container
+                    svgElement.style.width = '100%';
+                    panZoomInstance = svgPanZoom(svgElement, {
+                        zoomEnabled: true,
+                        controlIconsEnabled: false,
+                        fit: true,
+                        center: true,
+                        minZoom: 0.1,
+                        maxZoom: 10
+                    });
+                }
+            } catch (error) {
+                container.innerText = `Erro ao gerar diagrama: ${error}`;
+            }
+        }
+
+        // Funcoes de controle de zoom
+        function zoomIn() { if (panZoomInstance) panZoomInstance.zoomIn(); }
+        function zoomOut() { if (panZoomInstance) panZoomInstance.zoomOut(); }
+        function resetZoom() { if (panZoomInstance) panZoomInstance.resetZoom(); }
+
+        // Fecha o modal da estrutura.
+        function closeStructureMap() {
+            document.getElementById('structureModal').style.display = 'none';
+            if (panZoomInstance) {
+                panZoomInstance.destroy();
+                panZoomInstance = null;
+            }
+        }
+
+        // Fecha modal ao clicar fora da janela.
+        window.onclick = function(event) {
+            const modal = document.getElementById('structureModal');
+            if (event.target === modal) {
+                closeStructureMap();
+            }
+        };
+
+        // Carrega logs ao abrir a pagina.
+        fetchLogs();
+    </script>
+</body>
+</html>

@@ -1,0 +1,241 @@
+﻿TYPE "udtBotaoReset"
+VERSION : 0.1
+   STRUCT
+      i_bReset : Bool;   // Sinal do botão de reset
+      q_bLEDResetHabilitado : Bool;   // Comando do LED do botão de reset
+   END_STRUCT;
+
+END_TYPE
+
+TYPE "udtBotaoComando"
+VERSION : 0.1
+   STRUCT
+      i_bOnOff : Bool;   // Botao LIGA/Desliga no campo (pulsado)
+      q_bLEDLinhaOperando : Bool;   // Sinal para ligar LED no quadro indicando linha em operação
+   END_STRUCT;
+
+END_TYPE
+
+TYPE "udtBotaoSolicitaAcesso"
+VERSION : 0.1
+   STRUCT
+      i_bSolicitaAcesso : Bool;   // Sinal do botão de solicitar acesso
+      q_bLEDSolicitaAcesso : Bool;   // Comando do LED do botão de solicitar acesso
+      q_bBobinaLiberaAcesso : Bool;   // Sinal para bobina da chave de porta para liberar acesso
+   END_STRUCT;
+
+END_TYPE
+
+TYPE "udtTorreSinalizacao"
+VERSION : 0.1
+   STRUCT
+      q_bLampVerde : Bool;   // Sinal para lampada verde
+      q_bLampVermelha : Bool;   // Sinal para lampada vermelha
+      q_bLampAzul : Bool;   // Sinal para lampada azul
+      q_bLampAmarela : Bool;   // Sinal para lampada amarela
+      q_bSirene : Bool;   // Sinal para sirene
+   END_STRUCT;
+
+END_TYPE
+
+TYPE "ST_Contactor"
+VERSION : 0.1
+   STRUCT
+      i_xEnableConfirmation : Bool;
+      q_xEnable : Bool;
+   END_STRUCT;
+
+END_TYPE
+
+DATA_BLOCK "dbMapeamentoIO"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+NON_RETAIN
+   VAR 
+      abSensor : Array[0..64] of Bool;
+      abSE : Array[0..64] of Bool;
+      abSS : Array[0..32] of Bool;
+      abY : Array[0..32] of Bool;
+      abFreio : Array[0..32] of Bool;
+      stS19_1_2 : "udtBotaoReset";
+      stS19_1_3 : "udtBotaoComando";
+      stS21_2 : "udtBotaoReset";
+      stS21_3 : "udtBotaoComando";
+      stS17_1_2 : "udtBotaoReset";
+      stS17_1_3 : "udtBotaoComando";
+      stS17_1_4 : "udtBotaoSolicitaAcesso";
+      stS17_2_2 : "udtBotaoReset";
+      stS17_2_4 : "udtBotaoSolicitaAcesso";
+      stS17_3_2 : "udtBotaoReset";
+      stS17_3_3 : "udtBotaoComando";
+      stS17_3_4 : "udtBotaoSolicitaAcesso";
+      stS17_4_2 : "udtBotaoReset";
+      stS17_4_4 : "udtBotaoSolicitaAcesso";
+      stS17_5_2 : "udtBotaoReset";
+      stS17_5_4 : "udtBotaoSolicitaAcesso";
+      stS17_6_2 : "udtBotaoReset";
+      stS17_6_4 : "udtBotaoSolicitaAcesso";
+      stS17_7_2 : "udtBotaoReset";
+      stS17_7_4 : "udtBotaoSolicitaAcesso";
+      stX17 : "udtTorreSinalizacao";
+      stK1 : "ST_Contactor";
+      stK2 : "ST_Contactor";
+      stK3 : "ST_Contactor";
+      stK4 : "ST_Contactor";
+      stK5 : "ST_Contactor";
+      stK6 : "ST_Contactor";
+      stK7 : "ST_Contactor";
+      stK8 : "ST_Contactor";
+      stK9 : "ST_Contactor";
+      stK10 : "ST_Contactor";
+      stK11 : "ST_Contactor";
+      bInOutModeSelector : Bool;   // 0 - Palete de fora vai pra envolver; 1 - Desvia palete para fora da celula (sem envolver)
+   END_VAR
+
+
+BEGIN
+
+END_DATA_BLOCK
+
+FUNCTION "MapeamentoEntradas" : Void
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+
+BEGIN
+	
+	(*------------------------------------------------------------------------------------------------*)
+	
+	(* Cartao de entrada 0 *)
+	"dbMapeamentoIO".abSE["DPS"] := "REM_OS18869_I0_0"; //Confirmacao do DPS
+	"dbMapeamentoIO".stS19_1_2.i_bReset := "REM_OS18869_I0_1"; //Botoeira de rearme/reset - ITEM19_1
+	"dbMapeamentoIO".stS19_1_3.i_bOnOff := "REM_OS18869_I0_2"; //Botoeira de liga/desliga - ITEM19_1
+	"dbMapeamentoIO".stS21_2.i_bReset := "REM_OS18869_I0_3"; //Botoeira de rearme/reset - ITEM20 - ITEM21 - ITEM22
+	"dbMapeamentoIO".stS21_3.i_bOnOff := "REM_OS18869_I0_4"; //Botoeira de liga/desliga - ITEM20 - ITEM21 - ITEM22
+	"dbMapeamentoIO".stS17_1_2.i_bReset := "REM_OS18869_I0_5"; //Botoeira de rearme/reset IHM
+	"dbMapeamentoIO".stS17_1_3.i_bOnOff := "REM_OS18869_I0_6"; //Botoeira de liga/desliga IHM
+	"dbMapeamentoIO".stS17_2_2.i_bReset := "REM_OS18869_I0_7"; //Botoeira de rearme/reset porta abastecimento de slipsheet
+	"dbMapeamentoIO".stS17_2_4.i_bSolicitaAcesso := "REM_OS18869_I0_8"; //Botoeira de solicita acesso  - porta abastecimento de slipsheet
+	"dbMapeamentoIO".stS17_3_2.i_bReset := "REM_OS18869_I0_9"; //Botoeira de rearme/reset - Magazine de pallet
+	"dbMapeamentoIO".stS17_3_3.i_bOnOff := "REM_OS18869_I0_10"; //Botoeira de liga/desliga  - Magazine de pallet
+	"dbMapeamentoIO".stS17_4_2.i_bReset := "REM_OS18869_I0_11"; //Botoeira de rearme/reset - porta acesso pallet cheio
+	"dbMapeamentoIO".stS17_4_4.i_bSolicitaAcesso := "REM_OS18869_I0_12"; //Botoeira de solicita acesso  - porta esteiras pallet cheio
+	"dbMapeamentoIO".stS17_5_2.i_bReset := "REM_OS18869_I0_13"; //Botoeira de rearme/reset - porta acesso esteiras envolvedora
+	"dbMapeamentoIO".stS17_5_4.i_bSolicitaAcesso := "REM_OS18869_I0_14"; //Botoeira de solicita acesso  - porta acesso esteiras envolvedora
+	"dbMapeamentoIO".stS17_6_2.i_bReset := "REM_OS18869_I0_15"; //Botoeira de rearme/reset - porta acesso a envolvedora
+	
+	
+	(* Cartao de entrada 1 *)
+	"dbMapeamentoIO".stS17_6_4.i_bSolicitaAcesso := "REM_OS18869_I1_0"; //Botoeira de solicita acesso  - porta acesso a envolvedora
+	"dbMapeamentoIO".bInOutModeSelector := "REM_OS18869_I1_1"; //Manopla para desviar pallet antes da envolvedora
+	// := "REM_OS18869_I1_2"; //
+	"dbMapeamentoIO".stK8.i_xEnableConfirmation := "REM_OS18869_I1_3"; //Acionamento  ITEM10_2
+	"dbMapeamentoIO".stK9.i_xEnableConfirmation := "REM_OS18869_I1_4"; //Acionamento  ITEM10_3
+	"dbMapeamentoIO".stK10.i_xEnableConfirmation := "REM_OS18869_I1_5"; //Acionamento  ITEM11_2
+	"dbMapeamentoIO".stK11.i_xEnableConfirmation := "REM_OS18869_I1_6"; //Acionamento  ITEM11_2
+	"dbMapeamentoIO".stK6.i_xEnableConfirmation := "REM_OS18869_I1_7"; //Acionamento giratoria ITEM13_1
+	"dbMapeamentoIO".stK7.i_xEnableConfirmation := "REM_OS18869_I1_8"; //Acionamento giratoria ITEM13_2
+	"dbMapeamentoIO".stS17_7_2.i_bReset := "REM_OS18869_I1_9"; //Botoeira de rearme/reset - porta paletizacao trepckus
+	"dbMapeamentoIO".stS17_7_4.i_bSolicitaAcesso := "REM_OS18869_I1_10"; //Botoeira de solicita acesso  - porta paletizacao trepckus
+	// := "REM_OS18869_I1_11"; //
+	// := "REM_OS18869_I1_12"; //
+	// := "REM_OS18869_I1_13"; //
+	// := "REM_OS18869_I1_14"; //
+	// := "REM_OS18869_I1_15"; //
+	
+	(* Cartao de entrada 2 *)
+	"dbMapeamentoIO".abSensor["B1_4"] := "REM_OS18869_I2_0"; //Sensor magnetico braco direito dispensador recuado
+	"dbMapeamentoIO".abSensor["B1_5"] := "REM_OS18869_I2_1"; //Sensor magnetico braco direito dispensador avancado
+	"dbMapeamentoIO".abSensor["B1_6"] := "REM_OS18869_I2_2"; //Sensor magnetico braco esquerdo dispensador recuado
+	"dbMapeamentoIO".abSensor["B2_1"] := "REM_OS18869_I2_3"; //Sensor confirma pallet vazio no ITEM02
+	"dbMapeamentoIO".abSensor["B18_1"] := "REM_OS18869_I2_4"; //Sensor indutivo fim de curso - posicao horizontal captura -  aplicador de slipsheet
+	"dbMapeamentoIO".abSensor["B18_2"] := "REM_OS18869_I2_5"; //Sensor indutivo fim de curso - posicao horizontal entrega - aplicador de slipsheet
+	"dbMapeamentoIO".abSensor["B18_3"] := "REM_OS18869_I2_6"; //Sensor Palito fim de curso - posicao vertical em cima - do aplicador de slipsheet
+	"dbMapeamentoIO".abSensor["B18_4"] := "REM_OS18869_I2_7"; //Sensor indutivo fim  de curso - posicao veritical em baixo - do aplicador de slipsheet
+	"dbMapeamentoIO".abSensor["B18_5"] := "REM_OS18869_I2_8"; //Sensor fotoeletrico de nivel do estoque de chapas no aplicador de slipsheet
+	"dbMapeamentoIO".abSensor["B18_6"] := "REM_OS18869_I2_9"; //Sensor fotoeletrico para confirmar que o papelao nao caiu do aplicador de slipsheet
+	// := "REM_OS18869_I2_10"; //
+	"dbMapeamentoIO".abSensor["B4_1"] := "REM_OS18869_I2_11"; //Sensor confirma pallet vazio no ITEM04
+	"dbMapeamentoIO".abSensor["B9_1"] := "REM_OS18869_I2_12"; //Sensor confirma pallet vazio no ponto de paletizacao
+	"dbMapeamentoIO".abSensor["B9_2"] := "REM_OS18869_I2_13"; //Sensor confirma pallet cheio
+	"dbMapeamentoIO".abSensor["B25_1"] := "REM_OS18869_I2_14"; //Pressostato
+	"dbMapeamentoIO".abSensor["B3_1"] := "REM_OS18869_I2_15"; //Sensor confirma pallet vazio no ITEM03
+	
+	
+	(* Cartao de entrada 3 *)
+	// := "REM_OS18869_I3_0"; //
+	// := "REM_OS18869_I3_1"; //
+	"dbMapeamentoIO".abSensor["B8_1"] := "REM_OS18869_I3_2"; //Sensor confirma pallet cheio
+	"dbMapeamentoIO".abSensor["B10_3"] := "REM_OS18869_I3_3"; //Sensor confirma pallet na esteira
+	"dbMapeamentoIO".abSensor["B10_1"] := "REM_OS18869_I3_4"; //Sensor confirma transportador de pallet cheio recuado
+	"dbMapeamentoIO".abSensor["B10_2"] := "REM_OS18869_I3_5"; //Sensor confirma transportador de pallet cheio elevado
+	"dbMapeamentoIO".abSensor["B11_3"] := "REM_OS18869_I3_6"; //Sensor confirma pallet na esteira
+	"dbMapeamentoIO".abSensor["B11_1"] := "REM_OS18869_I3_7"; //Sensor confirma transportador de pallet cheio recuado
+	"dbMapeamentoIO".abSensor["B11_2"] := "REM_OS18869_I3_8"; //Sensor confirma transportador de pallet cheio elevado
+	"dbMapeamentoIO".abSensor["B12_1"] := "REM_OS18869_I3_9"; //Sensor confirma pallet cheio
+	"dbMapeamentoIO".abSensor["B13_3"] := "REM_OS18869_I3_10"; //Sensor confirma posicionamento 01 da esteira giratoria
+	"dbMapeamentoIO".abSensor["B13_4"] := "REM_OS18869_I3_11"; //Sensor confirma posicionamento 02 da esteira giratoria
+	"dbMapeamentoIO".abSensor["B13_1"] := "REM_OS18869_I3_12"; //Sensor confirma posicionamento do pallet na esteira giratoria
+	"dbMapeamentoIO".abSensor["B13_2"] := "REM_OS18869_I3_13"; //Sensor confirma posicionamento do pallet na esteira giratoria
+	"dbMapeamentoIO".abSensor["B13_5"] := "REM_OS18869_I3_14"; //Sensor confirma posicionamento 02 da esteira giratoria
+	"dbMapeamentoIO".abSensor["B14_1"] := "REM_OS18869_I3_15"; //Sensor muting 01 (lado interno)
+	
+	
+	(* Cartao de entrada 4 *)
+	"dbMapeamentoIO".abSensor["B14_2"] := "REM_OS18869_I4_0"; //Sensor muting 02 (lado interno)
+	"dbMapeamentoIO".abSensor["B14_3"] := "REM_OS18869_I4_1"; //Sensor muting 01 (lado externo)
+	"dbMapeamentoIO".abSensor["B14_4"] := "REM_OS18869_I4_2"; //Sensor muting 02 (lado externo)
+	"dbMapeamentoIO".abSensor["B14_5"] := "REM_OS18869_I4_3"; //Sensor saida de pallet cheio
+	"dbMapeamentoIO".abSensor["B14_6"] := "REM_OS18869_I4_4"; //Sensor saida de pallet cheio
+	"dbMapeamentoIO".abSensor["B29_1"] := "REM_OS18869_I4_5"; //Sensor confirma pallet cheio na envolvedora
+	"dbMapeamentoIO".abSensor["B16_1"] := "REM_OS18869_I4_6"; //Sensor confirma pallet cheio no ITEM16
+	"dbMapeamentoIO".abSensor["B16_2"] := "REM_OS18869_I4_7"; //Sensor muting 02 (lado interno)
+	"dbMapeamentoIO".abSensor["B16_3"] := "REM_OS18869_I4_8"; //Sensor muting 01 (lado interno)
+	"dbMapeamentoIO".abSensor["B19_1_1"] := "REM_OS18869_I4_9"; //Sensor de acumulo ITEM19_1
+	"dbMapeamentoIO".abSensor["B21_1"] := "REM_OS18869_I4_10"; //Sensor de acumulo ITEM21
+	"dbMapeamentoIO".abSensor["B22_1"] := "REM_OS18869_I4_11"; //Sensor de contagem de caixa - viradora de caixas
+	"dbMapeamentoIO".abSensor["B24_1"] := "REM_OS18869_I4_12"; //Sensor confirma terceira caixa na captura
+	"dbMapeamentoIO".abSensor["B24_2"] := "REM_OS18869_I4_13"; //Sensor confirma segunda caixa na captura
+	"dbMapeamentoIO".abSensor["B24_3"] := "REM_OS18869_I4_14"; //Sensor confirma primeira caixa na captura
+	"dbMapeamentoIO".abSensor["B24_4"] := "REM_OS18869_I4_15"; //Sensor confirma cancela de espacamento da captura recuada
+	
+	
+	(* Cartao de entrada 5 *)
+	"dbMapeamentoIO".abSensor["B5_1"] := "REM_OS18869_I5_0"; //Sensor confirma pallet vazio
+	"dbMapeamentoIO".abSensor["B6_1"] := "REM_OS18869_I5_1"; //Sensor confirma pallet no ponto de paletizacao - ITEM06
+	"dbMapeamentoIO".abSensor["B7_1"] := "REM_OS18869_I5_2"; //Sensor confirma pallet cheio - ITEM07
+	"dbMapeamentoIO".abSensor["B1_1"] := "REM_OS18869_I5_3"; //Sensor confirma estoque de pallet vazio no dispensador
+	"dbMapeamentoIO".abSensor["B1_2"] := "REM_OS18869_I5_4"; //Sensor indutivo de referenciamento posicao inferior dispensador
+	"dbMapeamentoIO".abSensor["B1_3"] := "REM_OS18869_I5_5"; //Sensor indutivo de referenciamento posicao superior dispensador
+	"dbMapeamentoIO".abSensor["B1_7"] := "REM_OS18869_I5_6"; //Sensor magnetico braco esquerdo dispensador avancado
+	"dbMapeamentoIO".abSensor["B19_2_1"] := "REM_OS18869_I5_7"; //Sensor confirma caixa no ITEM19_2
+	// := "REM_OS18869_I5_8"; //
+	// := "REM_OS18869_I5_9"; //
+	// := "REM_OS18869_I5_10"; //
+	// := "REM_OS18869_I5_11"; //
+	// := "REM_OS18869_I5_12"; //
+	// := "REM_OS18869_I5_13"; //
+	// := "REM_OS18869_I5_14"; //
+	// := "REM_OS18869_I5_15"; //
+	
+	
+	(* Cartao de entrada 6 *)
+	// := "REM_OS18869_I6_0"; //
+	// := "REM_OS18869_I6_1"; //
+	// := "REM_OS18869_I6_2"; //
+	// := "REM_OS18869_I6_3"; //
+	// := "REM_OS18869_I6_4"; //
+	// := "REM_OS18869_I6_5"; //
+	// := "REM_OS18869_I6_6"; //
+	// := "REM_OS18869_I6_7"; //
+	// := "REM_OS18869_I6_8"; //
+	// := "REM_OS18869_I6_9"; //
+	// := "REM_OS18869_I6_10"; //
+	// := "REM_OS18869_I6_11"; //
+	// := "REM_OS18869_I6_12"; //
+	// := "REM_OS18869_I6_13"; //
+	// := "REM_OS18869_I6_14"; //
+	// := "REM_OS18869_I6_15"; //
+	
+	
+END_FUNCTION
+

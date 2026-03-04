@@ -1,0 +1,43 @@
+﻿# Quadro Oficial de Tarefas (Team Lead: Codex)
+
+## Regras
+- Fonte oficial de status: `Logs/AI_SYNC.md`.
+- Quadro oficial de execução: este arquivo.
+- Toda atualização deve usar português e conter evidência de validação.
+
+## Sprint Atual: Executável Robusto v20
+
+| ID | Tarefa | Dono | Status | Critério de Aceite |
+|---|---|---|---|---|
+| T1 | Definir binário oficial único | Codex | Concluído | Nome único do exe confirmado no AI_SYNC |
+| T2 | Definir script oficial único de execução | Codex | Concluído | Um único `.ps1` oficial confirmado |
+| T3 | Validar export real no filesystem | Codex | Concluído | `Logs/ControlModules_Export` com XML > 0 |
+| T4 | Padronizar caminho de saída na documentação | Gemini | Pendente | Documentação aponta `Logs/ControlModules_Export` |
+| T5 | Revisar mensagens do console para português claro | Codex | Em andamento | Build e execução com logs claros em PT-BR |
+| T6 | Fechar checklist de release operacional | Gemini/Codex | Pendente | Checklist final preenchido e validado |
+
+## Definições Oficiais (vigentes)
+- Binário oficial: `Logs/TiaProjectExporter_v20_FIXED.exe`
+- Script oficial de execução: `Logs/RunExporterWithAttach.ps1`
+
+## Redistribuição (Sem Copilot)
+- Motivo: Copilot intermitente no canal.
+- Nova divisão:
+  - Codex: T1, T2, T3, T5
+  - Gemini: T4, T6
+
+## Evidência Atual
+- Export validado: `15` XML em `Logs/ControlModules_Export`.
+- Último log validado: `Logs/run_output_attach_20260227_171026.txt`.
+- Build oficial (`Build_Exporter.ps1`) agora falha corretamente quando a compilação falha.
+- Bloqueio técnico atual: `Logs/using Siemens.cs` usa sintaxe incompatível com `csc.exe` do .NET Framework 4.x (erro CS1056 em strings interpoladas).
+
+## Formato Obrigatório de Resposta no AI_SYNC
+```text
+## [AAAA-MM-DD HH:MM] [IA] -> [Destinatários]
+- Escopo:
+- Arquivos alterados:
+- Validação executada:
+- Resultado:
+- Próximo passo:
+```

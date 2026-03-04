@@ -1,0 +1,40 @@
+﻿# TIA Portal - arquivos grandes/binarios
+*.ap20
+*.ap19
+*.zap*
+*.s7*
+*.bak
+*.tmp
+*.cache
+
+# Binarios e artefatos de build
+*.exe
+*.dll
+*.pdb
+*.obj
+*.bin
+
+# Logs gerados
+Logs/run_output*.txt
+Logs/run_error*.txt
+Logs/*_latest.txt
+
+# Exportacoes e artefatos gerados
+Logs/ControlModules_Export/
+Logs/NewBlocks/
+DocumentacaoDoProjeto.html
+Release_v1.0/
+
+# VS/VSCode locais
+.vs/
+*.user
+*.suo
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Arquivos de sistema TIA muito grandes
+System/*.plf
+System/*.idx
+System/~PEData.*

@@ -1,0 +1,72 @@
+FUNCTION_BLOCK "FB_MonitorAtivo"
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      i_xLigar : Bool;   // Comando para ligar o ativo
+      i_xReset : Bool;   // Comando de reset de falha
+      i_fbConfirmacao : Bool;   // Feedback de que o ativo esta ligado (contator, etc)
+   END_VAR
+
+   VAR_OUTPUT 
+      o_xAtivoLigado : Bool;   // Saida para acionar o contator/inversor
+      o_xEmFalha : Bool;       // Sinaliza falha
+      o_xFalhaPartida : Bool;  // Falha por nao receber feedback na partida
+      o_xFalhaPerdaFb : Bool;  // Falha por perder feedback com ativo ligado
+   END_VAR
+
+   VAR 
+      s_tonFalhaPartida : TON_TIME;      // Timer para detectar falha na partida
+      s_tonFalhaPerdaFb : TON_TIME;      // Timer para detectar perda de feedback
+      s_rtrigLigar : R_TRIG;             // Detector de borda de subida para o comando de ligar
+   END_VAR
+
+   VAR CONSTANT
+      c_tTimeoutPartida : Time := T#5S;  // Tempo maximo para feedback de partida
+      c_tTimeoutPerdaFb : Time := T#2S;  // Tempo maximo para detectar perda de feedback
+   END_VAR
+
+BEGIN
+    // 1) Reset de falha
+    IF #i_xReset THEN
+        #o_xEmFalha := FALSE;
+        #o_xFalhaPartida := FALSE;
+        #o_xFalhaPerdaFb := FALSE;
+    END_IF;
+
+    // 2) Comando de partida (borda de subida)
+    #s_rtrigLigar(CLK := #i_xLigar);
+
+    IF #s_rtrigLigar.Q AND NOT #o_xEmFalha THEN
+        #o_xAtivoLigado := TRUE;
+    END_IF;
+
+    // 3) Desliga saida quando comando desligado
+    IF NOT #i_xLigar THEN
+        #o_xAtivoLigado := FALSE;
+    END_IF;
+
+    // 4) Monitora falha de partida
+    #s_tonFalhaPartida(
+        IN := #o_xAtivoLigado AND NOT #i_fbConfirmacao,
+        PT := #c_tTimeoutPartida
+    );
+
+    IF #s_tonFalhaPartida.Q THEN
+        #o_xFalhaPartida := TRUE;
+        #o_xEmFalha := TRUE;
+        #o_xAtivoLigado := FALSE;
+    END_IF;
+
+    // 5) Monitora perda de feedback com ativo ligado
+    #s_tonFalhaPerdaFb(
+        IN := #o_xAtivoLigado AND NOT #i_fbConfirmacao,
+        PT := #c_tTimeoutPerdaFb
+    );
+
+    IF #s_tonFalhaPerdaFb.Q THEN
+        #o_xFalhaPerdaFb := TRUE;
+        #o_xEmFalha := TRUE;
+        #o_xAtivoLigado := FALSE;
+    END_IF;
+
+END_FUNCTION_BLOCK

@@ -1,0 +1,31 @@
+FUNCTION "FC_GerenciadorStatus" : Int
+{ S7_Optimized_Access := 'TRUE' }
+VERSION : 0.1
+   VAR_INPUT 
+      i_xSegurancaOK : Bool;   // Entrada do rele de seguranca geral
+      i_xEmergencia : Bool;     // Botao de emergencia pressionado
+      i_xFalhaGeral : Bool;     // Alguma falha de processo
+      i_xEmCiclo : Bool;        // Maquina executando ciclo
+   END_VAR
+
+   VAR_TEMP
+      s_iStatus : Int;
+   END_VAR
+
+BEGIN
+    // PRIORIDADE DE STATUS:
+    // 99 Emergencia > 90 Seguranca atuada > 10 Falha > 1 Rodando > 0 Pronto
+    #s_iStatus := 0;
+
+    IF #i_xEmergencia THEN
+        #s_iStatus := 99; // Emergencia
+    ELSIF NOT #i_xSegurancaOK THEN
+        #s_iStatus := 90; // Seguranca atuada
+    ELSIF #i_xFalhaGeral THEN
+        #s_iStatus := 10; // Falha de processo
+    ELSIF #i_xEmCiclo THEN
+        #s_iStatus := 1;  // Em ciclo
+    END_IF;
+
+    #FC_GerenciadorStatus := #s_iStatus;
+END_FUNCTION
