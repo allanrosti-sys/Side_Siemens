@@ -50,3 +50,14 @@
 - Resultado:
 - Proximo passo:
 ```
+
+## Sprint TIA Map (Fase 0-3)
+
+| ID | Tarefa | Dono | Status | Criterio de Aceite |
+|---|---|---|---|---|
+| TM1 | Parser XML de blocos OB/FB/FC | Codex | Concluido | Parse dos 15 XMLs em `Logs/ControlModules_Export` |
+| TM2 | Analyzer de chamadas + resolver de DB | Codex | Concluido | Edges de call e instance_db gerados no payload |
+| TM3 | Endpoint backend `/api/graph/{id}` | Codex | Concluido | Endpoint retorna `nodes` e `edges` com status 200 |
+| TM4 | Boilerplate FastAPI + testes API | Codex | Concluido | `pytest` sem falhas para pipeline e API |
+| TM5 | Canvas React Flow com consumo da API | Codex/Gemini | Em validacao | Mapa renderiza com nos coloridos por tipo |
+| TM6 | CodeViewer/FilterPanel/DetailPanel | Gemini | Em andamento | Fluxo de detalhe por clique funcional |

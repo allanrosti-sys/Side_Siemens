@@ -38,3 +38,11 @@ Thumbs.db
 System/*.plf
 System/*.idx
 System/~PEData.*
+
+# TIA Map (frontend/backend) - artefatos locais
+tia-map/frontend/node_modules/
+tia-map/frontend/dist/
+tia-map/frontend/*.tsbuildinfo
+tia-map/backend/.pytest_cache/
+tia-map/backend/**/__pycache__/
+*.pyc

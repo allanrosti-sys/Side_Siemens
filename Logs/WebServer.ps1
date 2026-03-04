@@ -108,7 +108,8 @@ while ($listener.IsListening) {
                 "RunExporterWithAttach.ps1",
                 "Import-New-Blocks.ps1",
                 "Run-Full-Cycle.ps1",
-                "Generate-Documentation.ps1"
+                "Generate-Documentation.ps1",
+                "Run-TiaMap-Dev.ps1" # Novo script para iniciar o TIA Map
             )
 
             # Verifica se o script esta na lista permitida e se existe no disco
