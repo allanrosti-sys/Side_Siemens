@@ -68,9 +68,21 @@ export default function DetailPanel({ selectedNode, onClose }: DetailPanelProps)
         </div>
       </div>
 
-      <div style={{ flex: 1, padding: 16, background: "#f8fafc", overflow: "hidden" }}>
-        <div style={{ fontSize: 12, textTransform: "uppercase", color: "#334155", marginBottom: 8, fontWeight: 700 }}>Logica SCL</div>
-        <div style={{ height: "100%", border: "1px solid #d1d5db", borderRadius: 8, overflow: "hidden" }}>
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          padding: 16,
+          background: "#f8fafc",
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+        }}
+      >
+        <div style={{ fontSize: 12, textTransform: "uppercase", color: "#334155", marginBottom: 8, fontWeight: 700, flexShrink: 0 }}>
+          Logica SCL
+        </div>
+        <div style={{ flex: 1, minHeight: 0, border: "1px solid #d1d5db", borderRadius: 8, overflow: "hidden" }}>
           {data.code ? (
             <CodeViewer code={data.code} readOnly />
           ) : (

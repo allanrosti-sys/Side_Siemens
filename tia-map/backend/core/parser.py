@@ -27,8 +27,22 @@ def _build_block_id(block_type: str, name: str) -> str:
     return f"{block_type}:{name}".lower()
 
 
+def _read_xml_text(xml_path: Path) -> str:
+    """
+    Le XML com tolerancia a codificacao.
+    Prioriza UTF-8/UTF-16 e cai para cp1252 para evitar caracteres corrompidos.
+    """
+    raw_bytes = xml_path.read_bytes()
+    for encoding in ("utf-8-sig", "utf-16", "utf-16-le", "utf-16-be", "cp1252", "latin-1"):
+        try:
+            return raw_bytes.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return raw_bytes.decode("utf-8", errors="replace")
+
+
 def parse_block_file(xml_path: Path, export_root: Path) -> Block:
-    raw_xml = xml_path.read_text(encoding="utf-8")
+    raw_xml = _read_xml_text(xml_path)
     root = ET.fromstring(raw_xml)
 
     block_type = ""
@@ -131,4 +145,3 @@ def parse_blocks_from_export(export_root: Path) -> list[Block]:
         blocks.append(block)
 
     return blocks
-

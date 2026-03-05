@@ -378,7 +378,7 @@ while ($listener.IsListening) {
 
             if ($targetScript) {
                 # Preparar argumentos baseados no caminho configurado
-                $scriptArgs = ""
+                $scriptArgs = @()
                 $resolvedFromSelection = Resolve-ExportPath -BasePath $selectedTiaPath -FallbackPath $exportRoot
                 if (-not [string]::IsNullOrWhiteSpace($selectedTiaPath) -and (Test-Path $selectedTiaPath)) {
                     Write-Host "DEBUG: Caminho TIA configurado: '$selectedTiaPath'" -ForegroundColor DarkGray
@@ -388,32 +388,46 @@ while ($listener.IsListening) {
                         $ap20 = Get-ChildItem -Path $selectedTiaPath -Filter *.ap20 -File -Recurse -Depth 1 | Select-Object -First 1
                         if ($ap20) {
                             $exportDir = Join-Path $selectedTiaPath "Logs\ControlModules_Export"
-                            $scriptArgs = "-TargetProject `"$($ap20.FullName)`" -TargetExport `"$exportDir`""
-                            Write-Host "DEBUG: Exporter Args: $scriptArgs" -ForegroundColor DarkGray
+                            $scriptArgs = @("-TargetProject", $ap20.FullName, "-TargetExport", $exportDir)
+                            Write-Host ("DEBUG: Exporter Args: " + ($scriptArgs -join " ")) -ForegroundColor DarkGray
                         } else {
                             Write-Warning "ALERTA: Nenhum arquivo .ap20 encontrado em '$selectedTiaPath'"
                         }
                     }
                     elseif ($scriptName -eq "Generate-Documentation.ps1") {
                         if ($resolvedFromSelection -and (Test-Path $resolvedFromSelection)) {
-                            $scriptArgs = "-InputPath `"$resolvedFromSelection`""
-                            Write-Host "DEBUG: Doc Args: $scriptArgs" -ForegroundColor DarkGray
+                            $scriptArgs = @("-InputPath", $resolvedFromSelection)
+                            Write-Host ("DEBUG: Doc Args: " + ($scriptArgs -join " ")) -ForegroundColor DarkGray
                         }
                     }
                     elseif ($scriptName -eq "Run-TiaMap-Dev.ps1") {
                         if ($resolvedFromSelection -and (Test-Path $resolvedFromSelection)) {
-                            $scriptArgs = "-DataPath `"$resolvedFromSelection`""
-                            Write-Host "DEBUG: TIA Map Args: $scriptArgs" -ForegroundColor DarkGray
+                            $scriptArgs = @("-DataPath", $resolvedFromSelection)
+                            Write-Host ("DEBUG: TIA Map Args: " + ($scriptArgs -join " ")) -ForegroundColor DarkGray
+                        }
+                    }
+                    elseif ($scriptName -eq "Import-New-Blocks.ps1") {
+                        # Verifica se o frontend enviou caminho de origem especifico e resolve projeto alvo.
+                        $sourcePath = if ($json.sourcePath) { [string]$json.sourcePath } else { "" }
+                        $targetAp20 = Get-ChildItem -Path $selectedTiaPath -Filter *.ap20 -File -Recurse -Depth 1 -ErrorAction SilentlyContinue | Select-Object -First 1
+                        if ($sourcePath -and (Test-Path $sourcePath)) {
+                            $scriptArgs = @("-SourcePath", $sourcePath)
+                        }
+                        if ($targetAp20) {
+                            $scriptArgs += @("-TargetProjectPath", $targetAp20.FullName)
+                        }
+                        if ($scriptArgs.Count -gt 0) {
+                            Write-Host ("DEBUG: Import Args: " + ($scriptArgs -join " ")) -ForegroundColor DarkGray
                         }
                     }
                 }
 
-                Write-Host "Executando: $scriptName $scriptArgs" -ForegroundColor Yellow
+                Write-Host ("Executando: " + $scriptName + " " + ($scriptArgs -join " ")) -ForegroundColor Yellow
 
                 if ($scriptName -eq "Generate-Documentation.ps1") {
                     # Para documentacao, retorna URL final para o frontend abrir popup.
-                    if ($scriptArgs) {
-                        powershell -ExecutionPolicy Bypass -Command "& '$targetScript' $scriptArgs" | Out-Null
+                    if ($scriptArgs.Count -gt 0) {
+                        powershell -ExecutionPolicy Bypass -File $targetScript @scriptArgs | Out-Null
                     } else {
                         powershell -ExecutionPolicy Bypass -File $targetScript | Out-Null
                     }
@@ -440,8 +454,8 @@ while ($listener.IsListening) {
                     # Inicia o script em job separado para nao travar a UI.
                     Start-Job -ScriptBlock {
                         param($s, $a)
-                        if ($a) { powershell -ExecutionPolicy Bypass -Command "& '$s' $a" }
-                        else    { powershell -ExecutionPolicy Bypass -File $s }
+                        if ($a -and $a.Count -gt 0) { powershell -ExecutionPolicy Bypass -File $s @a }
+                        else { powershell -ExecutionPolicy Bypass -File $s }
                     } -ArgumentList $targetScript, $scriptArgs | Out-Null
 
                     $content = (@{ status = "success"; message = "Script iniciado em background." } | ConvertTo-Json -Compress)

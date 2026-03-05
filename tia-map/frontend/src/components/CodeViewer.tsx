@@ -1,44 +1,60 @@
-import Editor from "@monaco-editor/react";
-
-interface CodeViewerProps {
+﻿interface CodeViewerProps {
   code: string;
   language?: string;
-  theme?: "vs-dark" | "light";
   readOnly?: boolean;
 }
 
 export default function CodeViewer({
   code,
-  language = "pascal",
-  theme = "vs-dark",
-  readOnly = true,
+  language = "scl",
 }: CodeViewerProps) {
   return (
-    <div className="h-full w-full overflow-hidden rounded-md border border-gray-700 shadow-lg">
-      <div className="flex items-center justify-between border-b border-gray-700 bg-gray-800 px-4 py-2 text-sm font-mono text-gray-300">
-        <span>Visualizador SCL</span>
-        <span className="text-xs opacity-70">{language.toUpperCase()}</span>
-      </div>
-      <Editor
-        height="100%"
-        defaultLanguage={language}
-        value={code}
-        theme={theme}
-        options={{
-          readOnly,
-          minimap: { enabled: true },
-          scrollBeyondLastLine: false,
-          fontSize: 14,
-          fontFamily: "'Consolas', 'Monaco', 'Courier New', monospace",
-          automaticLayout: true,
+    <div
+      style={{
+        height: "100%",
+        width: "100%",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+        border: "1px solid #1f2937",
+        borderRadius: 8,
+        background: "#0b1020",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          padding: "8px 12px",
+          borderBottom: "1px solid #1f2937",
+          color: "#cbd5e1",
+          fontFamily: "Consolas, 'Courier New', monospace",
+          fontSize: 12,
+          flexShrink: 0,
         }}
-        loading={
-          <div className="flex h-full items-center justify-center text-gray-400">
-            Carregando editor...
-          </div>
-        }
-      />
+      >
+        <span>Visualizador SCL</span>
+        <span style={{ opacity: 0.7 }}>{language.toUpperCase()}</span>
+      </div>
+
+      <pre
+        style={{
+          margin: 0,
+          padding: 12,
+          flex: 1,
+          minHeight: 0,
+          overflow: "auto",
+          whiteSpace: "pre",
+          tabSize: 2,
+          color: "#e2e8f0",
+          fontFamily: "Consolas, 'Courier New', monospace",
+          fontSize: 12,
+          lineHeight: 1.4,
+        }}
+      >
+        {code}
+      </pre>
     </div>
   );
 }
-

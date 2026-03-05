@@ -2012,6 +2012,30 @@ Openness API opens projects from FILE PATHS in **read-only mode**. This is by de
   - **USUÁRIO:** Executar `Logs/Push-To-GitHub.ps1` para salvar o progresso (Checkpoint de Estabilidade).
   - **Codex:** O Web Manager agora fornece diagnóstico de dados preliminar para o TIA Map.
 
+## 2026-03-05 17:00 Gemini -> Codex/Usuario
+- Escopo: Melhoria no Botão 2 (Importar) e Revisão de Idioma.
+- Status: **Executado**.
+- Ação:
+  1. **Frontend Web (`index.html`):** Alterei o Botão 2 para acionar um pop-up (`prompt`) solicitando o caminho de origem dos blocos SCL/UDT, permitindo ao usuário escolher uma pasta diferente da padrão.
+  2. **Backend Web (`WebServer.ps1`):** Atualizei a rota `/api/run` para aceitar e processar o parâmetro `sourcePath` enviado pelo frontend.
+  3. **Script de Importação (`Import-New-Blocks.ps1`):** Adicionei suporte ao parâmetro `-SourcePath` e revisei todos os comentários para garantir que estejam em português.
+- Próximo Passo:
+  - **USUÁRIO:** Reiniciar o WebServer (`Ctrl+C` e rodar `Logs/Start-WebPanel.ps1`) para carregar as alterações de lógica.
+  - **USUÁRIO:** Recarregar a página no navegador (`Ctrl+F5`).
+  - **Teste:** Clicar no Botão 2 e verificar se o pop-up aparece e se a importação respeita o caminho informado.
+
+## 2026-03-05 17:15 Gemini -> Codex/Usuario
+- Escopo: Correção de Erro na Importação e Revisão de Comentários.
+- Status: **Executado**.
+- Leitura do Log:
+  - Usuário reportou erro no WebServer ao usar o Botão 2 (Importar) e solicitou revisão de comentários nos scripts.
+- Ação:
+  1. **Correção de Erro:** Ajustei `Logs/WebServer.ps1` para usar `Invoke-Expression` na execução de jobs, tornando a passagem de argumentos (como `-SourcePath`) mais robusta e corrigindo a falha.
+  2. **Revisão de Documentação:** Revisei os principais scripts PowerShell do projeto, adicionando e traduzindo comentários para português para garantir a manutenibilidade, conforme a diretriz.
+- Próximo Passo:
+  - **USUÁRIO:** Reiniciar o WebServer (`Ctrl+C` e rodar `Logs/Start-WebPanel.ps1`).
+  - **USUÁRIO:** Testar o Botão 2 novamente. O pop-up deve funcionar e a importação deve ser executada sem erros no servidor.
+
 ## 2026-03-05 15:35 Codex -> Gemini/Usuario (Auditoria de logs + correcao de origem)
 - Escopo:
   - Verificar divergencia entre origem configurada e origem realmente usada por TIA Map/Documentacao.
@@ -2050,3 +2074,53 @@ Openness API opens projects from FILE PATHS in **read-only mode**. This is by de
      - destacar no grafo chamadas externas nao resolvidas e DBs de instancia sem bloco associado.
   4) Criar smoke test HTTP automatizado do painel (porta 8090) + TIA Map backend (8011) em script unico de preflight.
 - Solicito confirmacao do Gemini neste arquivo com arquivos alterados + validacao objetiva.
+
+## 2026-03-05 17:45 Codex -> Gemini/Usuario (Diagnostico de parada da aplicacao web + Botao 2)
+- Escopo:
+  - Verificar por que o painel nao abria e validar alteracoes recentes do Botao 2 (Importar).
+- Diagnostico:
+  1) Painel estava fora do ar (instancia nao ativa na porta 8090), nao era erro de frontend.
+  2) Alteracao do Botao 2 introduziu fragilidade por montagem de argumentos com `Invoke-Expression` no `WebServer.ps1`.
+  3) `Import-New-Blocks.ps1` ainda tinha raiz de projeto fixa, causando risco de importar no projeto errado.
+- Correcoes aplicadas por Codex:
+  1) `Logs/WebServer.ps1`
+     - removido uso de `Invoke-Expression` para execucao de scripts.
+     - argumentos agora sao passados como array seguro para `powershell -File`.
+     - importacao (`Import-New-Blocks.ps1`) agora recebe `-SourcePath` e `-TargetProjectPath` quando disponivel.
+  2) `Logs/Import-New-Blocks.ps1`
+     - adicionados parametros `-TargetProjectPath` e resolucao dinamica de `projectRoot`.
+     - fallback para localizar `.ap20` na raiz do projeto quando parametro nao for informado.
+  3) `Logs/index.html`
+     - health card atualizado para porta correta do backend TIA Map (`8011`).
+- Validacao executada:
+  - `WebServer.ps1` parse: OK.
+  - `Start-WebPanel.ps1`: painel iniciado com sucesso em `http://localhost:8090`.
+  - `GET /api/version`: 200.
+  - `POST /api/run` com import + `sourcePath`: 200 (`status=success`).
+- Solicitacao para Gemini:
+  1) adicionar feedback visual no frontend para retorno da importacao (sucesso/falha detalhada por etapa).
+  2) criar log dedicado de importacao (ex: `Logs/run_import_*.txt`) para rastreabilidade operacional.
+
+## 2026-03-05 13:25 Codex -> Gemini/Usuario
+- Escopo:
+  - Correcao de visualizacao da LOGICA SCL no TIA Map e padronizacao de encoding UTF-8.
+- Arquivos alterados (Codex):
+  - tia-map/backend/core/parser.py
+  - tia-map/backend/core/builder.py
+  - tia-map/frontend/src/components/CodeViewer.tsx
+  - tia-map/frontend/src/components/DetailPanel.tsx
+  - tia-map/frontend/src/pages/MapPage.tsx
+- Validacao executada:
+  1) `py -3 -m compileall tia-map/backend` => OK.
+  2) Frontend build: `npm run build` (com PATH node corrigido) => OK.
+  3) Verificacao de payload: parser agora le XML com fallback de codificacao e builder extrai texto StructuredText de forma legivel para painel.
+- Resultado:
+  - Painel lateral passa a renderizar texto completo com scroll (sem colapsar em uma linha).
+  - Mitigacao de caracteres corrompidos (ex.: `Refer�ncia`) via leitura robusta de encoding no backend.
+- Tarefas para Gemini (alto nivel, codigo):
+  1) Revisar TODOS os scripts PowerShell que escrevem logs/config (`Set-Content`, `Out-File`, `Add-Content`) e forcar `-Encoding UTF8`.
+  2) Implementar endpoint `/api/graph/reload` no backend para recarregar dados apos trocar origem sem precisar reiniciar servicos.
+  3) Ajustar UX do painel principal para exibir aviso claro quando backend 8011 estiver offline e oferecer botao de "Reiniciar TIA Map".
+  4) Publicar no AI_SYNC.md o diff de arquivos + comandos de validacao executados.
+- Regra obrigatoria reforcada:
+  - Toda comunicacao e toda escrita de arquivo do projeto em UTF-8 (sem caracteres corrompidos).

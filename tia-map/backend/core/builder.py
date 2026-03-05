@@ -1,5 +1,6 @@
 ﻿from __future__ import annotations
 
+import html
 import re
 
 from .models import Block, Edge
@@ -14,17 +15,69 @@ TYPE_COLORS = {
 }
 
 
+def _normalize_whitespace(text: str) -> str:
+    lines = [line.rstrip() for line in text.replace("\r\n", "\n").replace("\r", "\n").split("\n")]
+    normalized = "\n".join(lines).strip()
+    return re.sub(r"\n{3,}", "\n\n", normalized)
+
+
+def _extract_structured_text(raw_xml: str) -> str:
+    """
+    Converte trecho StructuredText (XML AST) para string legivel no painel.
+    """
+    st_block = re.search(
+        r"<StructuredText\b[^>]*>(.*?)</StructuredText>",
+        raw_xml,
+        re.IGNORECASE | re.DOTALL,
+    )
+    if not st_block:
+        return ""
+
+    body = st_block.group(1)
+    body = re.sub(
+        r"<NewLine\b[^>]*Num=\"(\d+)\"[^>]*/>",
+        lambda m: "\n" * max(1, int(m.group(1))),
+        body,
+        flags=re.IGNORECASE,
+    )
+    body = re.sub(
+        r"<Blank\b[^>]*Num=\"(\d+)\"[^>]*/>",
+        lambda m: " " * max(1, int(m.group(1))),
+        body,
+        flags=re.IGNORECASE,
+    )
+    body = re.sub(
+        r"<Token\b[^>]*Text=\"([^\"]*)\"[^>]*/>",
+        lambda m: html.unescape(m.group(1)),
+        body,
+        flags=re.IGNORECASE,
+    )
+    body = re.sub(
+        r"<Component\b[^>]*Name=\"([^\"]*)\"[^>]*/>",
+        lambda m: m.group(1),
+        body,
+        flags=re.IGNORECASE,
+    )
+    body = re.sub(
+        r"<ConstantValue\b[^>]*>(.*?)</ConstantValue>",
+        lambda m: m.group(1),
+        body,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+    body = re.sub(r"</?[^>]+>", "", body)
+    body = html.unescape(body)
+    return _normalize_whitespace(body)
+
+
 def _extract_code_preview(raw_xml: str) -> str:
     """Retorna um trecho legivel para o painel lateral do frontend."""
-    st_match = re.search(r"<StructuredText>(.*?)</StructuredText>", raw_xml, re.IGNORECASE | re.DOTALL)
-    if st_match:
-        snippet = st_match.group(1).strip()
-        if snippet:
-            return snippet
+    structured = _extract_structured_text(raw_xml)
+    if structured:
+        return structured
 
     source_match = re.search(r"<Source>(.*?)</Source>", raw_xml, re.IGNORECASE | re.DOTALL)
     if source_match:
-        snippet = source_match.group(1).strip()
+        snippet = _normalize_whitespace(html.unescape(source_match.group(1)))
         if snippet:
             return snippet
 
@@ -32,7 +85,7 @@ def _extract_code_preview(raw_xml: str) -> str:
     preview = "\n".join(lines[:120])
     if len(lines) > 120:
         preview += "\n..."
-    return preview
+    return _normalize_whitespace(preview)
 
 
 def _node_payload(

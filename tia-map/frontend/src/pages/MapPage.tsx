@@ -133,7 +133,7 @@ export default function MapPage() {
         <FilterPanel onFilterChange={setFilters} />
         {loadError ? (
           <div className="tm-banner error">
-            Erro ao conectar no backend (porta 8001). Verifique o launcher do TIA Map.
+            Erro ao conectar no backend (porta 8011). Verifique o launcher do TIA Map.
           </div>
         ) : (
           <div className="tm-banner">

@@ -146,7 +146,7 @@
             </div>
             <div class="health-item">
                 <span class="health-label">TIA MAP (API)</span>
-                <span class="health-val">Porta 8001</span>
+                <span class="health-val">Porta 8011</span>
             </div>
             <div class="health-item">
                 <span class="health-label">TIA MAP (UI)</span>
@@ -190,7 +190,7 @@
 
         <div class="actions">
             <button class="btn-export" onclick="runScript('RunExporterWithAttach.ps1')">1. Exportar (Backup XML)</button>
-            <button class="btn-import" onclick="runScript('Import-New-Blocks.ps1')">2. Importar (SCL/UDT)</button>
+            <button class="btn-import" onclick="requestImportPath()">2. Importar (SCL/UDT)</button>
             <button class="btn-cycle" onclick="runScript('Run-Full-Cycle.ps1')">3. Ciclo DevOps (Full)</button>
             <button class="btn-doc" onclick="runScript('Generate-Documentation.ps1')">4. Documentacao (HTML)</button>
             <button class="btn-map" onclick="openStructureMap()">5. Mapa Estrutural</button>
@@ -253,13 +253,27 @@
             else status.style.color = '#0b4f74';
         }
 
-        async function runScript(scriptName) {
+        async function requestImportPath() {
+            // Pop-up solicitando a origem dos blocos
+            const defaultPath = "C:\\Users\\Administrador\\Documents\\tirol-ipiranga-os18869_20260224_PE_V20\\Logs\\NewBlocks";
+            const path = prompt("Informe o caminho da pasta contendo os arquivos .scl e .udt para importacao:", defaultPath);
+            
+            if (path !== null) { // Se usuario nao cancelou
+                if (path.trim() === "") {
+                    setStatus("Importacao cancelada: caminho vazio.", "error");
+                } else {
+                    runScript('Import-New-Blocks.ps1', { sourcePath: path });
+                }
+            }
+        }
+
+        async function runScript(scriptName, extraData = {}) {
             setStatus(`Status: solicitando execucao de ${scriptName}...`, 'info');
             try {
                 const response = await fetch('/api/run', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ script: scriptName })
+                    body: JSON.stringify({ script: scriptName, ...extraData })
                 });
 
                 const result = await parseJsonSafe(response);
