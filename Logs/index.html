@@ -109,12 +109,19 @@
             display:block; margin-top:10px; padding:12px; background:#0369a1; color:white;
             text-align:center; border-radius:8px; text-decoration:none; font-weight:600;
         }
+        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
+        .stat-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px; text-align: center; }
+        .stat-val { display: block; font-size: 18px; font-weight: bold; color: #0f172a; }
+        .stat-label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+        
         .health-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px; }
         .health-item { background: #f1f5f9; padding: 10px; border-radius: 6px; text-align: center; font-size: 12px; border: 1px solid #cbd5e1; }
         .health-label { display: block; color: #64748b; margin-bottom: 4px; font-weight: 600; }
         .health-val { font-weight: bold; color: #0f172a; }
         .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
         .dot.ok { background-color: #22c55e; } .dot.nok { background-color: #ef4444; }
+        .legend { display: flex; gap: 15px; margin-top: 10px; font-size: 12px; color: #64748b; justify-content: center; }
+        .step-guide { background: #fff7ed; border-left: 4px solid #f97316; padding: 10px; margin: 15px 0; font-size: 13px; color: #9a3412; }
         .path-box { margin: 10px 0 14px; padding: 10px; border: 1px solid #dbe4ef; border-radius: 8px; background: #f8fafc; }
         .path-box label { display:block; font-size:12px; font-weight:700; color:#334155; margin-bottom:6px; }
         .path-row { display:flex; gap:8px; }
@@ -135,7 +142,7 @@
         <div class="health-grid">
             <div class="health-item">
                 <span class="health-label">WEBSERVER</span>
-                <span class="health-val"><span class="dot ok"></span>Online (8080)</span>
+                <span class="health-val" id="server-version"><span class="dot ok"></span>Online (8090)</span>
             </div>
             <div class="health-item">
                 <span class="health-label">TIA MAP (API)</span>
@@ -148,13 +155,39 @@
         </div>
         <div class="status" id="status-text">Sistema pronto.</div>
         <div class="path-box">
-            <label for="tia-path-input">Caminho da pasta do projeto TIA</label>
+            <label for="tia-path-input">CONFIGURACAO DE ORIGEM (Pasta do Projeto)</label>
             <div class="path-row">
-                <input id="tia-path-input" type="text" placeholder="Ex.: C:\Projetos\MeuProjetoTIA" />
-                <button class="small-btn" onclick="saveTiaPath()">Salvar</button>
+                <input id="tia-path-input" type="text" placeholder="Cole aqui o caminho da pasta onde esta o .ap20 (Ex: C:\Projetos\Tirol)" />
+                <button class="small-btn" onclick="saveTiaPath()" style="background-color: #0f172a; color: white;">Definir Origem</button>
             </div>
-            <div id="tia-path-info" class="path-info">Caminho nao configurado.</div>
+            <div id="tia-path-info" class="path-info">Aguardando configuracao...</div>
+            
+            <div id="coverage-panel" style="display:none; margin-top:12px; border-top:1px solid #e2e8f0; padding-top:12px;">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <span class="stat-val" id="stat-total">-</span>
+                        <span class="stat-label">Total XML</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-val" id="stat-ob" style="color:#7e57c2">-</span>
+                        <span class="stat-label">OBs</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-val" id="stat-fb" style="color:#1e88e5">-</span>
+                        <span class="stat-label">FBs</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-val" id="stat-fc" style="color:#2e7d32">-</span>
+                        <span class="stat-label">FCs</span>
+                    </div>
+                </div>
+            </div>
         </div>
+
+        <div class="step-guide">
+            <strong>FLUXO DE OPERACAO:</strong> 1. Defina a pasta de origem acima &rarr; 2. Execute "Exportar" (Botao 1) &rarr; 3. Visualize os mapas (Botoes 5, 6 ou 7).
+        </div>
+
         <div class="actions">
             <button class="btn-export" onclick="runScript('RunExporterWithAttach.ps1')">1. Exportar (Backup XML)</button>
             <button class="btn-import" onclick="runScript('Import-New-Blocks.ps1')">2. Importar (SCL/UDT)</button>
@@ -185,6 +218,12 @@
                     <button class="zoom-btn" onclick="zoomIn()">+</button>
                     <button class="zoom-btn" onclick="zoomOut()">-</button>
                     <button class="zoom-btn" onclick="resetZoom()">R</button>
+                </div>
+                <div class="legend">
+                    <span><span style="color:#7e57c2">●</span> OB (Roxo)</span>
+                    <span><span style="color:#1e88e5">●</span> FB (Azul)</span>
+                    <span><span style="color:#2e7d32">●</span> FC (Verde)</span>
+                    <span><span style="color:#9e9e9e">●</span> DB (Cinza)</span>
                 </div>
             </div>
         </div>
@@ -230,6 +269,12 @@
                         const linkDiv = document.getElementById('tia-map-link-container');
                         linkDiv.innerHTML = '<a href="http://localhost:5173" target="_blank">Abrir TIA Map (http://localhost:5173)</a>';
                     }
+                    
+                    // Se o backend retornou uma URL de documentacao (ex: Generate-Documentation.ps1)
+                    if (result.docUrl) {
+                        window.open(result.docUrl, '_blank');
+                        setStatus(`Documentacao gerada e aberta em nova aba.`, 'success');
+                    }
                     setTimeout(fetchLogs, 1200);
                 } else {
                     let errorMsg = `Erro: ${result.message || 'Falha nao informada.'}`;
@@ -242,14 +287,30 @@
             }
         }
 
+        async function loadServerVersion() {
+            try {
+                const response = await fetch('/api/version');
+                if (response.ok) {
+                    const data = await parseJsonSafe(response);
+                    if (data.version) {
+                        document.getElementById('server-version').innerHTML = `<span class="dot ok"></span>v${data.version} (${data.port || 8090})`;
+                    }
+                }
+            } catch (e) { console.log('Versao nao disponivel'); }
+        }
+
         async function loadTiaPath() {
             try {
                 const response = await fetch('/api/project-path');
+                if (response.status === 404) {
+                    throw new Error("Rota /api/project-path nao encontrada. Abra o painel pela URL correta (http://localhost:8090).");
+                }
                 const data = await parseJsonSafe(response);
                 const input = document.getElementById('tia-path-input');
                 const info = document.getElementById('tia-path-info');
                 input.value = data.tiaPath || '';
-                info.innerText = `Origem: ${data.resolvedExportPath || '-'} | XMLs: ${data.xmlCount ?? 0}`;
+                info.innerText = `Origem XML detectada: ${data.resolvedExportPath || 'Nao encontrada'} | Arquivos indexados: ${data.xmlCount ?? 0}`;
+                loadCoverage();
             } catch (error) {
                 document.getElementById('tia-path-info').innerText = `Falha ao carregar caminho: ${error}`;
             }
@@ -268,15 +329,35 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ path: pathValue })
                 });
+                if (response.status === 404) {
+                    throw new Error("Rota /api/project-path nao encontrada. Abra o painel pela URL correta (http://localhost:8090).");
+                }
                 const data = await parseJsonSafe(response);
                 if (data.status === 'success') {
-                    setStatus('Caminho TIA salvo com sucesso.', 'success');
-                    document.getElementById('tia-path-info').innerText = `Origem: ${data.resolvedExportPath || '-'} | XMLs: ${data.xmlCount ?? 0}`;
+                    setStatus('Origem definida com sucesso.', 'success');
+                    document.getElementById('tia-path-info').innerText = `Origem XML detectada: ${data.resolvedExportPath || 'Nao encontrada'} | Arquivos indexados: ${data.xmlCount ?? 0}`;
+                    loadCoverage();
                 } else {
                     setStatus(`Erro ao salvar caminho: ${data.message || 'falha desconhecida'}`, 'error');
                 }
             } catch (error) {
                 setStatus(`Erro de conexao ao salvar caminho: ${error}`, 'error');
+            }
+        }
+
+        async function loadCoverage() {
+            try {
+                const response = await fetch('/api/coverage');
+                if (response.ok) {
+                    const data = await parseJsonSafe(response);
+                    document.getElementById('coverage-panel').style.display = 'block';
+                    document.getElementById('stat-total').innerText = data.total;
+                    document.getElementById('stat-ob').innerText = data.types.OB;
+                    document.getElementById('stat-fb').innerText = data.types.FB;
+                    document.getElementById('stat-fc').innerText = data.types.FC;
+                }
+            } catch (e) {
+                console.log('Erro ao carregar cobertura:', e);
             }
         }
 
@@ -327,8 +408,8 @@
                         controlIconsEnabled: false,
                         fit: true,
                         center: true,
-                        minZoom: 0.1,
-                        maxZoom: 10
+                        minZoom: 0.01,
+                        maxZoom: 100
                     });
                 }
             } catch (error) {
@@ -363,6 +444,7 @@
             }
         };
 
+        loadServerVersion();
         loadTiaPath();
         fetchLogs();
     </script>

@@ -1,12 +1,12 @@
-﻿<#
-.SYNOPSIS
-  Gera relatorio HTML a partir dos XMLs exportados.
-#>
+param(
+    [string]$InputPath
+)
 
 $ErrorActionPreference = 'Stop'
 
 $scriptPath = Split-Path -Parent $MyInvocation.MyCommand.Path
-$inputPath = Join-Path $scriptPath 'Logs\ControlModules_Export'
+$defaultInput = Join-Path $scriptPath 'Logs\ControlModules_Export'
+$inputPath = if (-not [string]::IsNullOrWhiteSpace($InputPath)) { $InputPath } else { $defaultInput }
 $outputPath = Join-Path $scriptPath 'DocumentacaoDoProjeto.html'
 
 Write-Host 'Iniciando gerador de documentacao...' -ForegroundColor Cyan
@@ -16,7 +16,7 @@ if (-not (Test-Path $inputPath)) {
     throw 'Diretorio de entrada nao encontrado. Execute a exportacao primeiro.'
 }
 
-$xmlFiles = Get-ChildItem -Path $inputPath -Filter *.xml -Recurse
+$xmlFiles = Get-ChildItem -Path $inputPath -Filter *.xml -Recurse -File
 if ($xmlFiles.Count -eq 0) {
     throw 'Nenhum arquivo XML encontrado no diretorio de entrada.'
 }
@@ -24,7 +24,7 @@ if ($xmlFiles.Count -eq 0) {
 $blocks = @()
 foreach ($file in $xmlFiles) {
     try {
-        [xml]$xmlContent = Get-Content -Path $file.FullName -Raw
+        [xml]$xmlContent = Get-Content -Path $file.FullName -Raw -Encoding UTF8
 
         $ns = New-Object System.Xml.XmlNamespaceManager($xmlContent.NameTable)
         $ns.AddNamespace('SI', 'http://www.siemens.com/automation/Openness/SW/Interface/v5')
@@ -107,5 +107,8 @@ $htmlFooter = @"
 </html>
 "@
 
-($htmlHeader + $htmlBody + $htmlFooter) | Out-File -FilePath $outputPath -Encoding UTF8
+$finalHtml = $htmlHeader + $htmlBody + $htmlFooter
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+[System.IO.File]::WriteAllText($outputPath, $finalHtml, $utf8NoBom)
+
 Write-Host ('Sucesso. HTML gerado em: ' + $outputPath) -ForegroundColor Green

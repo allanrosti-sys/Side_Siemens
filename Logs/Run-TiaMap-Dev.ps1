@@ -1,11 +1,15 @@
 ﻿# Script: Run-TiaMap-Dev.ps1
 # Objetivo: iniciar ambiente de desenvolvimento do TIA Map (backend + frontend).
 
+param(
+    [string]$DataPath
+)
+
 $projectRoot = if ($PSScriptRoot) { Split-Path -Path $PSScriptRoot -Parent } else { (Get-Location).Path }
 $backendPath = Join-Path $projectRoot "tia-map\backend"
 $frontendPath = Join-Path $projectRoot "tia-map\frontend"
 
-$backendPort = 8001
+$backendPort = 8011
 $frontendPort = 5173
 
 Write-Host "=== TIA MAP LAUNCHER ===" -ForegroundColor Cyan
@@ -45,12 +49,41 @@ function Resolve-NpmCmd {
     return $null
 }
 
-function Test-PortAvailable {
+function Test-PortListening {
     param([int]$Port)
     $listening = netstat -ano | Select-String ":$Port\s+.*LISTENING"
-    if ($listening) {
-        Write-Error "Porta $Port ja esta em uso. Feche o processo atual dessa porta e tente novamente."
-        exit 1
+    return ($null -ne $listening)
+}
+
+function Stop-ProcessOnPort {
+    param([int]$Port)
+    $conn = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($conn -and $conn.OwningProcess -gt 0) {
+        try {
+            Stop-Process -Id $conn.OwningProcess -Force -ErrorAction Stop
+            Write-Host "Processo na porta $Port encerrado (PID $($conn.OwningProcess))." -ForegroundColor Yellow
+            Start-Sleep -Seconds 1
+        } catch {
+            Write-Warning "Falha ao encerrar processo da porta ${Port}: $($_.Exception.Message)"
+        }
+    }
+}
+
+function Stop-UvicornBackend {
+    param([int]$Port)
+    $targets = Get-CimInstance Win32_Process | Where-Object {
+        ($_.Name -match 'python|py.exe') -and
+        ($_.CommandLine -match "uvicorn") -and
+        ($_.CommandLine -match "main:app") -and
+        ($_.CommandLine -match "--port\\s+$Port")
+    }
+    foreach ($proc in $targets) {
+        try {
+            Stop-Process -Id $proc.ProcessId -Force -ErrorAction Stop
+            Write-Host "Processo uvicorn encerrado: PID $($proc.ProcessId)." -ForegroundColor Yellow
+        } catch {
+            Write-Warning "Falha ao encerrar PID $($proc.ProcessId): $($_.Exception.Message)"
+        }
     }
 }
 
@@ -77,9 +110,6 @@ if (-not $npmExe) {
     exit 1
 }
 
-Test-PortAvailable -Port $backendPort
-Test-PortAvailable -Port $frontendPort
-
 Write-Host "Verificacao concluida." -ForegroundColor Green
 Write-Host "Python: $pythonExe" -ForegroundColor DarkGreen
 Write-Host "NPM: $npmExe" -ForegroundColor DarkGreen
@@ -88,13 +118,40 @@ Write-Host "NPM: $npmExe" -ForegroundColor DarkGreen
 $nodePath = "C:\Program Files\nodejs"
 $effectivePath = if ($env:Path -like "*$nodePath*") { $env:Path } else { "$nodePath;$env:Path" }
 
-Write-Host "Iniciando backend (FastAPI) na porta $backendPort..." -ForegroundColor Yellow
-$backendCmd = "cd '$backendPath'; `$env:Path='$effectivePath'; $pythonExe -m uvicorn main:app --reload --port $backendPort"
-Start-Process powershell -ArgumentList "-NoExit", "-Command", $backendCmd
+$backendUp = Test-PortListening -Port $backendPort
+$frontendUp = Test-PortListening -Port $frontendPort
 
-Write-Host "Iniciando frontend (Vite) na porta $frontendPort..." -ForegroundColor Yellow
-$frontendCmd = "cd '$frontendPath'; `$env:Path='$effectivePath'; & '$npmExe' run dev"
-Start-Process powershell -ArgumentList "-NoExit", "-Command", $frontendCmd
+# Quando DataPath for informado, reinicia o backend para garantir que a nova origem seja aplicada.
+if (-not [string]::IsNullOrWhiteSpace($DataPath)) {
+    if (Test-Path $DataPath) {
+        Write-Host "Origem de dados solicitada: $DataPath" -ForegroundColor Cyan
+    } else {
+        Write-Warning "DataPath informado nao existe: $DataPath. Sera usada a origem padrao."
+    }
+    Stop-UvicornBackend -Port $backendPort
+    Stop-ProcessOnPort -Port $backendPort
+    $backendUp = $false
+}
+
+if ($backendUp) {
+    Write-Host "Backend ja ativo na porta $backendPort. Nao sera reiniciado." -ForegroundColor DarkYellow
+} else {
+    Write-Host "Iniciando backend (FastAPI) na porta $backendPort..." -ForegroundColor Yellow
+    $backendDataPath = ""
+    if (-not [string]::IsNullOrWhiteSpace($DataPath) -and (Test-Path $DataPath)) {
+        $backendDataPath = $DataPath
+    }
+    $backendCmd = "cd '$backendPath'; `$env:Path='$effectivePath'; `$env:TIA_MAP_DATA_PATH='$backendDataPath'; $pythonExe -m uvicorn main:app --reload --port $backendPort"
+    Start-Process powershell -ArgumentList "-NoExit", "-Command", $backendCmd
+}
+
+if ($frontendUp) {
+    Write-Host "Frontend ja ativo na porta $frontendPort. Nao sera reiniciado." -ForegroundColor DarkYellow
+} else {
+    Write-Host "Iniciando frontend (Vite) na porta $frontendPort..." -ForegroundColor Yellow
+    $frontendCmd = "cd '$frontendPath'; `$env:Path='$effectivePath'; & '$npmExe' run dev"
+    Start-Process powershell -ArgumentList "-NoExit", "-Command", $frontendCmd
+}
 
 Write-Host ""
 Write-Host "Servicos iniciados em novas janelas do PowerShell." -ForegroundColor Green

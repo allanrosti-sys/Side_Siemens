@@ -4,7 +4,7 @@
 # Data: 2026-03-02
 
 param(
-    [int]$Port = 8080
+    [int]$Port = 8090
 )
 
 $ErrorActionPreference = 'Stop'
@@ -49,17 +49,26 @@ function Resolve-ExportPath {
     if (-not [string]::IsNullOrWhiteSpace($BasePath)) {
         $candidates.Add((Join-Path $BasePath "Logs\\ControlModules_Export"))
         $candidates.Add((Join-Path $BasePath "ControlModules_Export"))
-        $candidates.Add((Join-Path $BasePath "Logs"))
+        # Permite usar a pasta diretamente quando o usuario apontar ja para ControlModules_Export.
         $candidates.Add($BasePath)
     }
     $candidates.Add($FallbackPath)
 
-    foreach ($candidate in $candidates) {
-        if (-not (Test-Path $candidate)) { continue }
-        $xmlCount = (Get-ChildItem -Path $candidate -Filter *.xml -File -Recurse -ErrorAction SilentlyContinue | Measure-Object).Count
-        if ($xmlCount -gt 0) { return $candidate }
+    function Get-BlockXmlCount([string]$candidatePath) {
+        $blockFiles = Get-ChildItem -Path $candidatePath -Filter *.xml -File -Recurse -ErrorAction SilentlyContinue |
+            Where-Object { $_.BaseName -match '^(OB|FB|FC)_' }
+        return ($blockFiles | Measure-Object).Count
     }
 
+    $firstExisting = $null
+    foreach ($candidate in $candidates) {
+        if (-not (Test-Path $candidate)) { continue }
+        if (-not $firstExisting) { $firstExisting = $candidate }
+        $blockCount = Get-BlockXmlCount $candidate
+        if ($blockCount -gt 0) { return $candidate }
+    }
+
+    if ($firstExisting) { return $firstExisting }
     return $FallbackPath
 }
 
@@ -104,6 +113,34 @@ function New-ProjectMermaid {
         $safeName = $dir.Name.Replace('"', "'")
         $xmlCount = (Get-ChildItem -Path $dir.FullName -Filter *.xml -File -Recurse -ErrorAction SilentlyContinue | Measure-Object).Count
         $lines.Add("  ROOT --> $node[`"$safeName ($xmlCount)`"]")
+    }
+
+    # Expande estrutura de blocos (limitado para evitar diagrama gigante).
+    $maxBlockNodes = 180
+    $blockFiles = $allXml | Sort-Object FullName | Select-Object -First $maxBlockNodes
+    $folderNodes = @{}
+    $bIndex = 0
+    foreach ($file in $blockFiles) {
+        $relativeFolder = (Split-Path -Parent ($file.FullName.Replace($ExportPath, "").TrimStart('\'))).Trim()
+        if ([string]::IsNullOrWhiteSpace($relativeFolder)) { $relativeFolder = "raiz" }
+
+        if (-not $folderNodes.ContainsKey($relativeFolder)) {
+            $folderId = "F$($folderNodes.Count + 1)"
+            $folderNodes[$relativeFolder] = $folderId
+            $safeFolder = $relativeFolder.Replace('\', '/').Replace('"', "'")
+            $lines.Add("  ROOT --> $folderId[`"$safeFolder`"]")
+        }
+
+        $bIndex++
+        $blockId = "B$bIndex"
+        $base = $file.BaseName.Replace('"', "'")
+        $label = if ($base.Length -gt 42) { $base.Substring(0, 42) + "..." } else { $base }
+        $lines.Add("  $($folderNodes[$relativeFolder]) --> $blockId[`"$label`"]")
+    }
+
+    if ($allXml.Count -gt $maxBlockNodes) {
+        $remaining = $allXml.Count - $maxBlockNodes
+        $lines.Add("  ROOT --> MORE[`"... +$remaining blocos nao exibidos no mapa estrutural`"]")
     }
 
     return ($lines -join "`n")
@@ -277,6 +314,36 @@ while ($listener.IsListening) {
                 $statusCode = 404
             }
         }
+        # ROTA: Documento HTML gerado (DocumentacaoDoProjeto)
+        elseif ($path -eq "/DocumentacaoDoProjeto.html") {
+            $docCandidates = @(
+                (Join-Path $projectRoot "DocumentacaoDoProjeto.html"),
+                (Join-Path $scriptRoot "DocumentacaoDoProjeto.html")
+            )
+            $docPath = $docCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+            if ($docPath) {
+                $content = [System.IO.File]::ReadAllText($docPath, [System.Text.Encoding]::UTF8)
+            } else {
+                $content = "<h1>Documentacao ainda nao gerada.</h1><p>Use o botao 4 para gerar.</p>"
+                $statusCode = 404
+            }
+        }
+        # ROTA: Versao/capacidades da API
+        elseif ($path -eq "/api/version") {
+            $content = (@{
+                status = "success"
+                version = "2026.03.05"
+                port = $Port
+                capabilities = @(
+                    "run-scripts",
+                    "project-path",
+                    "mermaid-structure",
+                    "mermaid-execution",
+                    "documentation-popup"
+                )
+            } | ConvertTo-Json -Compress)
+            $contentType = "application/json; charset=utf-8"
+        }
         # ROTA: Executar Script (/api/run) - Metodo POST
         elseif ($path -eq "/api/run" -and $method -eq "POST") {
             $reader = [System.IO.StreamReader]::new($request.InputStream, [System.Text.Encoding]::UTF8)
@@ -310,15 +377,75 @@ while ($listener.IsListening) {
             }
 
             if ($targetScript) {
-                Write-Host "Executando: $scriptName" -ForegroundColor Yellow
+                # Preparar argumentos baseados no caminho configurado
+                $scriptArgs = ""
+                $resolvedFromSelection = Resolve-ExportPath -BasePath $selectedTiaPath -FallbackPath $exportRoot
+                if (-not [string]::IsNullOrWhiteSpace($selectedTiaPath) -and (Test-Path $selectedTiaPath)) {
+                    Write-Host "DEBUG: Caminho TIA configurado: '$selectedTiaPath'" -ForegroundColor DarkGray
 
-                # Inicia o script em um Job separado para nao travar o servidor web
-                Start-Job -ScriptBlock {
-                    param($s)
-                    powershell -ExecutionPolicy Bypass -File $s
-                } -ArgumentList $targetScript | Out-Null
+                    if ($scriptName -eq "RunExporterWithAttach.ps1") {
+                        # Busca recursiva limitada para encontrar o .ap20 caso esteja em subpasta
+                        $ap20 = Get-ChildItem -Path $selectedTiaPath -Filter *.ap20 -File -Recurse -Depth 1 | Select-Object -First 1
+                        if ($ap20) {
+                            $exportDir = Join-Path $selectedTiaPath "Logs\ControlModules_Export"
+                            $scriptArgs = "-TargetProject `"$($ap20.FullName)`" -TargetExport `"$exportDir`""
+                            Write-Host "DEBUG: Exporter Args: $scriptArgs" -ForegroundColor DarkGray
+                        } else {
+                            Write-Warning "ALERTA: Nenhum arquivo .ap20 encontrado em '$selectedTiaPath'"
+                        }
+                    }
+                    elseif ($scriptName -eq "Generate-Documentation.ps1") {
+                        if ($resolvedFromSelection -and (Test-Path $resolvedFromSelection)) {
+                            $scriptArgs = "-InputPath `"$resolvedFromSelection`""
+                            Write-Host "DEBUG: Doc Args: $scriptArgs" -ForegroundColor DarkGray
+                        }
+                    }
+                    elseif ($scriptName -eq "Run-TiaMap-Dev.ps1") {
+                        if ($resolvedFromSelection -and (Test-Path $resolvedFromSelection)) {
+                            $scriptArgs = "-DataPath `"$resolvedFromSelection`""
+                            Write-Host "DEBUG: TIA Map Args: $scriptArgs" -ForegroundColor DarkGray
+                        }
+                    }
+                }
 
-                $content = (@{ status = "success"; message = "Script iniciado em background." } | ConvertTo-Json -Compress)
+                Write-Host "Executando: $scriptName $scriptArgs" -ForegroundColor Yellow
+
+                if ($scriptName -eq "Generate-Documentation.ps1") {
+                    # Para documentacao, retorna URL final para o frontend abrir popup.
+                    if ($scriptArgs) {
+                        powershell -ExecutionPolicy Bypass -Command "& '$targetScript' $scriptArgs" | Out-Null
+                    } else {
+                        powershell -ExecutionPolicy Bypass -File $targetScript | Out-Null
+                    }
+
+                    $docCandidates = @(
+                        (Join-Path $projectRoot "DocumentacaoDoProjeto.html"),
+                        (Join-Path $scriptRoot "DocumentacaoDoProjeto.html")
+                    )
+                    $docGenerated = $docCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+                    if ($docGenerated) {
+                        $content = (@{
+                            status = "success"
+                            message = "Documentacao gerada com sucesso."
+                            docUrl = "/DocumentacaoDoProjeto.html"
+                        } | ConvertTo-Json -Compress)
+                    } else {
+                        $content = (@{
+                            status = "error"
+                            message = "Script executado, mas DocumentacaoDoProjeto.html nao foi encontrado."
+                        } | ConvertTo-Json -Compress)
+                        $statusCode = 500
+                    }
+                } else {
+                    # Inicia o script em job separado para nao travar a UI.
+                    Start-Job -ScriptBlock {
+                        param($s, $a)
+                        if ($a) { powershell -ExecutionPolicy Bypass -Command "& '$s' $a" }
+                        else    { powershell -ExecutionPolicy Bypass -File $s }
+                    } -ArgumentList $targetScript, $scriptArgs | Out-Null
+
+                    $content = (@{ status = "success"; message = "Script iniciado em background." } | ConvertTo-Json -Compress)
+                }
                 $contentType = "application/json; charset=utf-8"
             } else {
                 $debugPaths = @(
@@ -395,6 +522,38 @@ while ($listener.IsListening) {
                 $content = (@{ log = "Nenhum log encontrado." } | ConvertTo-Json -Compress)
             }
 
+            $contentType = "application/json; charset=utf-8"
+        }
+        # ROTA: Diagnostico de Cobertura (/api/coverage)
+        elseif ($path -eq "/api/coverage") {
+            $resolvedPath = Resolve-ExportPath -BasePath $selectedTiaPath -FallbackPath $exportRoot
+            
+            $stats = @{
+                path = $resolvedPath
+                total = 0
+                valid = 0
+                types = @{ OB=0; FB=0; FC=0; DB=0 }
+                rejected = @()
+            }
+
+            if (Test-Path $resolvedPath) {
+                $files = Get-ChildItem -Path $resolvedPath -Filter *.xml -File -Recurse -ErrorAction SilentlyContinue
+                $stats.total = $files.Count
+                
+                foreach ($f in $files) {
+                    if ($f.Length -gt 0) {
+                        $stats.valid++
+                        if ($f.Name -match '^OB') { $stats.types.OB++ }
+                        elseif ($f.Name -match '^FB') { $stats.types.FB++ }
+                        elseif ($f.Name -match '^FC') { $stats.types.FC++ }
+                        elseif ($f.Name -match '^DB') { $stats.types.DB++ }
+                    } else {
+                        $stats.rejected += $f.Name
+                    }
+                }
+            }
+            
+            $content = ($stats | ConvertTo-Json -Compress -Depth 3)
             $contentType = "application/json; charset=utf-8"
         }
         # ROTA: Obter Diagrama Mermaid (/api/mermaid)

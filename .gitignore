@@ -52,3 +52,6 @@ tia-map/frontend/*.tsbuildinfo
 tia-map/backend/.pytest_cache/
 tia-map/backend/**/__pycache__/
 *.pyc
+
+# Configuracao local do painel web
+Logs/web_settings.json

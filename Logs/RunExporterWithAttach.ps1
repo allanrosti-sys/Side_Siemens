@@ -1,10 +1,22 @@
 ﻿# Script oficial de execucao (Attach)
+param(
+    [string]$TargetProject,
+    [string]$TargetExport
+)
+
 $ErrorActionPreference = "Stop"
 
-$projPath = "C:\Users\Administrador\Documents\tirol-ipiranga-os18869_20260224_PE_V20\tirol-ipiranga-os18869_20260224_PE_V20.ap20"
-$exportPath = "C:\Users\Administrador\Documents\tirol-ipiranga-os18869_20260224_PE_V20\Logs\ControlModules_Export"
+$defaultProj = "C:\Users\Administrador\Documents\tirol-ipiranga-os18869_20260224_PE_V20\tirol-ipiranga-os18869_20260224_PE_V20.ap20"
+$defaultExport = "C:\Users\Administrador\Documents\tirol-ipiranga-os18869_20260224_PE_V20\Logs\ControlModules_Export"
+
+$projPath = if (-not [string]::IsNullOrWhiteSpace($TargetProject)) { $TargetProject } else { $defaultProj }
+$exportPath = if (-not [string]::IsNullOrWhiteSpace($TargetExport)) { $TargetExport } else { $defaultExport }
+
 $exePath = "C:\Users\Administrador\Documents\tirol-ipiranga-os18869_20260224_PE_V20\Logs\TiaProjectExporter_v20.exe"
 $logPath = "C:\Users\Administrador\Documents\tirol-ipiranga-os18869_20260224_PE_V20\Logs\run_output_attach_$(Get-Date -Format 'yyyyMMdd_HHmmss').txt"
+
+Write-Host "Projeto Alvo: $projPath" -ForegroundColor Cyan
+Write-Host "Pasta Export: $exportPath" -ForegroundColor Cyan
 
 Write-Host "[1/5] Verificando executavel..."
 if (-not (Test-Path $exePath)) {

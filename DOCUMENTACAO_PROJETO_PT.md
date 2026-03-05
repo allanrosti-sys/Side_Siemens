@@ -85,6 +85,16 @@ Extrair todos os blocos de programa de um projeto TIA Portal S7-1500 e salvá-lo
 
 ---
 
+## ⚙️ CONFIGURAÇÃO DE AMBIENTE (Web Manager)
+
+Para que as ferramentas de visualização (Mapas e TIA Map) funcionem corretamente, o sistema precisa saber onde estão os arquivos do projeto.
+
+1. **Definir Origem:** No topo do Web Manager, cole o caminho da pasta onde está o seu projeto `.ap20`.
+2. **Salvar:** Clique em "Definir Origem". O sistema buscará automaticamente a pasta `Logs\ControlModules_Export` dentro desse caminho.
+3. **Verificação:** O painel mostrará quantos arquivos XML foram encontrados. Se for 0, execute a **Exportação (Botão 1)**.
+
+---
+
 ## ⚙️ FLUXO DE EXECUÇÃO COMPLETO
 
 O fluxo foi simplificado para máxima robustez e mínima intervenção do usuário.

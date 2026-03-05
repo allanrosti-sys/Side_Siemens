@@ -1,10 +1,12 @@
 ﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  applyEdgeChanges,
+  applyNodeChanges,
   Background,
   Controls,
   ReactFlow,
-  useEdgesState,
-  useNodesState,
+  type EdgeChange,
+  type NodeChange,
   type NodeMouseHandler,
 } from "@xyflow/react";
 
@@ -12,13 +14,12 @@ import DetailPanel from "../components/DetailPanel";
 import FilterPanel, { type FilterState } from "../components/FilterPanel";
 import type { GraphEdge, GraphNode, GraphPayload } from "../types/graph";
 
-const API_BASE = "http://localhost:8001";
+const API_BASE = "http://localhost:8011";
 
 export default function MapPage() {
-  const [nodes, setNodes, onNodesChange] = useNodesState<GraphNode>([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState<GraphEdge>([]);
-  const [originalNodes, setOriginalNodes] = useState<GraphNode[]>([]);
-  const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
+  const [allNodes, setAllNodes] = useState<GraphNode[]>([]);
+  const [allEdges, setAllEdges] = useState<GraphEdge[]>([]);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const [filters, setFilters] = useState<FilterState>({
@@ -30,6 +31,33 @@ export default function MapPage() {
     showExternal: true,
   });
 
+  const applyInitialLayout = useCallback((nodes: GraphNode[]): GraphNode[] => {
+    const hasAnyPosition = nodes.some((node) => (node.position?.x ?? 0) !== 0 || (node.position?.y ?? 0) !== 0);
+    if (hasAnyPosition) {
+      return nodes;
+    }
+
+    const columns: Record<string, number> = { OB: 0, FB: 1, FC: 2, DB: 3, EXTERNAL: 4 };
+    const rowByType = new Map<string, number>();
+
+    return [...nodes]
+      .sort((a, b) => String(a.data.label).localeCompare(String(b.data.label)))
+      .map((node) => {
+        const type = String(node.data.blockType ?? "EXTERNAL").toUpperCase();
+        const column = columns[type] ?? 5;
+        const currentRow = rowByType.get(type) ?? 0;
+        rowByType.set(type, currentRow + 1);
+
+        return {
+          ...node,
+          position: {
+            x: 260 + column * 360,
+            y: 120 + currentRow * 130,
+          },
+        };
+      });
+  }, []);
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -38,9 +66,9 @@ export default function MapPage() {
           throw new Error(`Falha HTTP ${response.status}`);
         }
         const data: GraphPayload = await response.json();
-        setNodes((data.nodes ?? []) as GraphNode[]);
-        setOriginalNodes((data.nodes ?? []) as GraphNode[]);
-        setEdges((data.edges ?? []) as GraphEdge[]);
+        const initialNodes = applyInitialLayout((data.nodes ?? []) as GraphNode[]);
+        setAllNodes(initialNodes);
+        setAllEdges((data.edges ?? []) as GraphEdge[]);
         setLoadError(null);
       } catch (error) {
         console.error("Erro ao carregar grafo:", error);
@@ -49,10 +77,10 @@ export default function MapPage() {
     };
 
     fetchData();
-  }, [setEdges, setNodes]);
+  }, [applyInitialLayout]);
 
   const filteredNodes = useMemo(() => {
-    return originalNodes.filter((node) => {
+    return allNodes.filter((node) => {
       const data = node.data;
       const type = String(data.blockType ?? "");
 
@@ -70,20 +98,33 @@ export default function MapPage() {
 
       return true;
     });
-  }, [filters, originalNodes]);
+  }, [allNodes, filters]);
 
   const visibleNodeIds = useMemo(() => new Set(filteredNodes.map((node) => node.id)), [filteredNodes]);
 
   const filteredEdges = useMemo(() => {
-    return edges.filter((edge) => visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target));
-  }, [edges, visibleNodeIds]);
+    return allEdges.filter((edge) => visibleNodeIds.has(edge.source) && visibleNodeIds.has(edge.target));
+  }, [allEdges, visibleNodeIds]);
+
+  const selectedNode = useMemo(
+    () => (selectedNodeId ? allNodes.find((node) => node.id === selectedNodeId) ?? null : null),
+    [allNodes, selectedNodeId],
+  );
 
   const onNodeClick = useCallback<NodeMouseHandler<GraphNode>>((_, node) => {
-    setSelectedNode(node);
+    setSelectedNodeId(node.id);
   }, []);
 
   const onPaneClick = useCallback(() => {
-    setSelectedNode(null);
+    setSelectedNodeId(null);
+  }, []);
+
+  const onNodesChange = useCallback((changes: NodeChange<GraphNode>[]) => {
+    setAllNodes((current) => applyNodeChanges(changes, current));
+  }, []);
+
+  const onEdgesChange = useCallback((changes: EdgeChange<GraphEdge>[]) => {
+    setAllEdges((current) => applyEdgeChanges(changes, current));
   }, []);
 
   return (
@@ -114,7 +155,7 @@ export default function MapPage() {
           <Controls />
         </ReactFlow>
 
-        <DetailPanel selectedNode={selectedNode} onClose={() => setSelectedNode(null)} />
+        <DetailPanel selectedNode={selectedNode} onClose={() => setSelectedNodeId(null)} />
       </div>
     </div>
   );
