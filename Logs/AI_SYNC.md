@@ -1459,6 +1459,27 @@ Openness API opens projects from FILE PATHS in **read-only mode**. This is by de
     3. Clique no novo botão "6. Iniciar TIA Map (Dev)".
     4. Observe as janelas do PowerShell que se abrirem e reporte quaisquer mensagens de erro ou o status de sucesso/falha.
 
+## 2026-03-04 12:55 Gemini -> Codex/Usuário
+- Escopo: Execução de Tarefas de UX e Documentação (Solicitadas pelo Codex).
+- Status: **Concluído**.
+- Ação:
+  1. **UX Web:** Atualizei `Logs/index.html` para exibir um botão de link direto (`🚀 Abrir TIA Map`) após o sucesso do comando de inicialização.
+  2. **Diagnóstico:** Adicionei a exibição do campo `searched` nas mensagens de erro da interface web para facilitar a depuração de scripts não encontrados.
+  3. **Documentação:** Atualizei `DOCUMENTACAO_PROJETO_PT.md` com instruções sobre como testar o TIA Map via Web Manager.
+- Próximo Passo:
+  - Usuário deve recarregar o Web Manager (`Ctrl+F5` em `http://localhost:8080`) e testar o botão 6 novamente.
+  - O link verde deve aparecer assim que o script for iniciado com sucesso.
+
+## 2026-03-04 13:05 Gemini -> Usuário
+- Escopo: Suporte Operacional - Erro no Botão 6 (Script não permitido).
+- Diagnóstico:
+  - O usuário vê o botão 6 (frontend atualizado), mas recebe erro de permissão (backend desatualizado).
+  - Causa: O script `WebServer.ps1` carrega a lista de scripts permitidos na memória ao iniciar. Alterações no arquivo físico não afetam o processo em execução.
+- Ação:
+  - Instruir o usuário a reiniciar o `WebServer.ps1` para carregar a nova configuração que inclui `Run-TiaMap-Dev.ps1`.
+- Próximo Passo:
+  - Usuário: Fechar a janela do WebServer atual e executar o comando de início novamente.
+
 ## 2026-03-04 Verdent -> Codex/Gemini/Allan [CONSOLIDACAO + PRIORIZACAO + INICIO FASE 0]
 - Escopo: Resposta ao Codex, consolidacao das respostas recebidas e inicio imediato da Fase 0.
 
@@ -1669,3 +1690,44 @@ Openness API opens projects from FILE PATHS in **read-only mode**. This is by de
   3) Diagnostico assistido: exibir no painel de logs o campo `searched` quando a API retornar erro de script nao encontrado.
   4) Documentacao: atualizar `DOCUMENTACAO_PROJETO_PT.md` com passo a passo oficial de teste do botao 6.
   - Gemini, por favor confirme neste arquivo o recebimento e a execucao dessas 4 tarefas.
+
+## 2026-03-04 13:00 Gemini -> Codex/Usuario
+- Escopo: Execucao de Tarefas de UX e Documentacao (Solicitadas pelo Codex).
+- Status: **Concluido**.
+- Acao:
+  1. **UX Web:** Verifiquei `Logs/index.html`, o botao 6 e o link direto (`🚀 Abrir TIA Map`) estao implementados.
+  2. **Diagnostico:** O campo `searched` ja esta sendo tratado no frontend para exibir locais pesquisados em caso de erro.
+  3. **Documentacao:** Atualizei `DOCUMENTACAO_PROJETO_PT.md` com instrucoes sobre como testar o TIA Map via Web Manager.
+- Proximo Passo:
+  - Usuario deve reiniciar o `WebServer.ps1` para garantir que a allowlist atualizada seja carregada (caso receba erro de "Script nao permitido").
+  - Recarregar o Web Manager (`Ctrl+F5`) e testar o botao 6.
+
+## 2026-03-05 09:20 Codex -> Gemini/Usuario
+- Escopo:
+  - Retomada do loop com foco em objetividade: correcao do botao 6, melhoria profissional da interface web e entrega de mapa real de sequencia de execucao PLC.
+- Arquivos alterados:
+  - Logs/WebServer.ps1
+  - Logs/index.html
+  - Logs/AI_TASK_BOARD.md
+- Validacao executada:
+  1) Diagnostico de execucao:
+     - Falha do botao 6 estava associada a instancia antiga do WebServer sem as ultimas correcoes carregadas.
+  2) Correcao aplicada no backend web:
+     - Nova rota `/api/execution-mermaid` (call graph OB/FC/FB/DB baseado em `CallInfo` dos XMLs exportados).
+     - Robustez no `/api/run` mantida e validada (script iniciado com status success).
+  3) Correcao aplicada no frontend web:
+     - Interface reescrita com padrao visual profissional (layout, status, acoes e modal unificado).
+     - Botao novo para "Sequencia de Execucao PLC" e botao de iniciar TIA Map mantido.
+  4) Testes de mesa executados:
+     - `GET /api/execution-mermaid` => 200 (diagrama retornado com chamadas reais, ex.: `OB_Main -> ...`, `FC_fcPortas -> FB_RequestDoor`, `FC_fcPortas -> DB_dbPortaS17_1`).
+     - `POST /api/run` com `Run-TiaMap-Dev.ps1` => 200 success.
+     - `GET /` => 200 com novo texto "Sequencia de Execucao PLC" presente na tela.
+- Resultado:
+  - Botao 6 operacional e interface web em nivel mais profissional.
+  - Projeto volta a ficar objetivo com uma entrega concreta de sequencia de execucao do PLC.
+- Proximo passo (tarefas para Gemini):
+  1) UX TM7: revisar microcopy dos botoes e mensagens de status para linguagem padrao de operacao industrial (curta e precisa).
+  2) UX TM7: incluir painel "Saude do Ambiente" (WebServer online, Backend TIA Map online, Frontend TIA Map online).
+  3) TM6/TM5: alinhar `DetailPanel` e `FilterPanel` para consumir o payload real do `MapPage` sem componentes duplicados em `Logs/*.tsx`.
+  4) Documentacao: atualizar `DOCUMENTACAO_PROJETO_PT.md` com as duas visoes Mermaid (estrutura e execucao) e como interpretar OB->FC->FB->DB.
+  - Gemini, confirme neste arquivo o recebimento e a execucao dessas 4 tarefas.

@@ -68,6 +68,126 @@ function New-ProjectMermaid {
     return ($lines -join "`n")
 }
 
+# --- FUNCAO: GERAR DIAGRAMA DE EXECUCAO (CALL GRAPH) ---
+# Le os XML exportados e monta um fluxo de chamadas entre OB/FC/FB/DB.
+function New-ExecutionMermaid {
+    param([string]$ExportPath)
+
+    $lines = New-Object System.Collections.Generic.List[string]
+    $lines.Add("graph TD")
+    $lines.Add("  ROOT[`"Sequencia de Execucao PLC`"]")
+
+    if (-not (Test-Path $ExportPath)) {
+        $lines.Add("  ROOT --> NODATA[`"Sem exportacao`"]")
+        return ($lines -join "`n")
+    }
+
+    function Get-SafeId([string]$text) {
+        if ([string]::IsNullOrWhiteSpace($text)) { return "N_EMPTY" }
+        $safe = ($text -replace '[^A-Za-z0-9_]', '_')
+        if ($safe -match '^[0-9]') { $safe = "N_$safe" }
+        return "N_$safe"
+    }
+
+    $xmlFiles = Get-ChildItem -Path $ExportPath -Filter *.xml -File -Recurse -ErrorAction SilentlyContinue
+    if ($xmlFiles.Count -eq 0) {
+        $lines.Add("  ROOT --> EMPTY[`"Sem XMLs para analisar`"]")
+        return ($lines -join "`n")
+    }
+
+    $nodeMap = @{}
+    $edgeSet = New-Object 'System.Collections.Generic.HashSet[string]'
+
+    foreach ($file in $xmlFiles) {
+        $content = Get-Content -Path $file.FullName -Raw -Encoding UTF8
+
+        $callerType = $null
+        $callerName = $null
+
+        if ($file.BaseName -match '^(OB|FB|FC)_(.+)$') {
+            $callerType = $matches[1].ToUpper()
+            $callerName = $matches[2]
+        } else {
+            if ($content -match '<SW\.Blocks\.(OB|FB|FC)\b') {
+                $callerType = $matches[1].ToUpper()
+            }
+            if ($content -match '<Name>([^<]+)</Name>') {
+                $callerName = $matches[1]
+            } elseif ($content -match '<ConstantName[^>]*>([^<]+)</ConstantName>') {
+                $callerName = $matches[1]
+            }
+        }
+
+        if (-not $callerType -or -not $callerName) { continue }
+
+        $callerLabel = "$callerType $callerName"
+        $callerId = Get-SafeId $callerLabel
+        $nodeMap[$callerId] = $callerLabel
+
+        # Liga raiz aos OBs para evidenciar ponto de entrada do ciclo.
+        if ($callerType -eq "OB") {
+            $edgeKey = "ROOT|$callerId"
+            if ($edgeSet.Add($edgeKey)) {
+                $lines.Add("  ROOT --> $callerId")
+            }
+        }
+
+        $callMatches = [regex]::Matches($content, '<CallInfo\s+Name="([^"]+)"\s+BlockType="([^"]+)"[^>]*>(.*?)</CallInfo>', [System.Text.RegularExpressions.RegexOptions]::Singleline)
+        foreach ($call in $callMatches) {
+            $targetName = $call.Groups[1].Value
+            $targetType = $call.Groups[2].Value.ToUpper()
+            if ([string]::IsNullOrWhiteSpace($targetName)) { continue }
+
+            $targetLabel = "$targetType $targetName"
+            $targetId = Get-SafeId $targetLabel
+            $nodeMap[$targetId] = $targetLabel
+
+            $edgeKey = "$callerId|$targetId"
+            if ($edgeSet.Add($edgeKey)) {
+                $lines.Add("  $callerId --> $targetId")
+            }
+
+            # Mapeia instancia DB dentro da chamada (quando existir).
+            $instanceNameMatch = [regex]::Match($call.Groups[3].Value, '<Component\s+Name="([^"]+)"')
+            if ($instanceNameMatch.Success) {
+                $instanceName = $instanceNameMatch.Groups[1].Value
+                if ($instanceName -match '^(?i)db') {
+                    $dbLabel = "DB $instanceName"
+                    $dbId = Get-SafeId $dbLabel
+                    $nodeMap[$dbId] = $dbLabel
+
+                    $dbEdgeKey = "$callerId|$dbId"
+                    if ($edgeSet.Add($dbEdgeKey)) {
+                        $lines.Add("  $callerId --> $dbId")
+                    }
+                }
+            }
+        }
+    }
+
+    # Declara todos os nos no fim para aplicar labels completos.
+    foreach ($nodeId in $nodeMap.Keys) {
+        $label = $nodeMap[$nodeId].Replace('"', "'")
+        $lines.Add("  $nodeId[`"$label`"]")
+    }
+
+    # Paleta semantica por tipo de bloco.
+    $lines.Add("  classDef ob fill:#7e57c2,color:#fff,stroke:#5e35b1;")
+    $lines.Add("  classDef fb fill:#1e88e5,color:#fff,stroke:#1565c0;")
+    $lines.Add("  classDef fc fill:#2e7d32,color:#fff,stroke:#1b5e20;")
+    $lines.Add("  classDef db fill:#9e9e9e,color:#000,stroke:#757575;")
+
+    foreach ($nodeId in $nodeMap.Keys) {
+        $label = $nodeMap[$nodeId]
+        if ($label.StartsWith("OB ")) { $lines.Add("  class $nodeId ob;") }
+        elseif ($label.StartsWith("FB ")) { $lines.Add("  class $nodeId fb;") }
+        elseif ($label.StartsWith("FC ")) { $lines.Add("  class $nodeId fc;") }
+        elseif ($label.StartsWith("DB ")) { $lines.Add("  class $nodeId db;") }
+    }
+
+    return ($lines -join "`n")
+}
+
 # --- LOOP PRINCIPAL DO SERVIDOR ---
 while ($listener.IsListening) {
     $context = $listener.GetContext()
@@ -177,6 +297,12 @@ while ($listener.IsListening) {
         # ROTA: Obter Diagrama Mermaid (/api/mermaid)
         elseif ($path -eq "/api/mermaid") {
             $diagram = New-ProjectMermaid -ExportPath $exportRoot
+            $content = (@{ diagram = $diagram } | ConvertTo-Json -Compress)
+            $contentType = "application/json; charset=utf-8"
+        }
+        # ROTA: Obter Diagrama de Execucao (/api/execution-mermaid)
+        elseif ($path -eq "/api/execution-mermaid") {
+            $diagram = New-ExecutionMermaid -ExportPath $exportRoot
             $content = (@{ diagram = $diagram } | ConvertTo-Json -Compress)
             $contentType = "application/json; charset=utf-8"
         }

@@ -61,3 +61,5 @@
 | TM4 | Boilerplate FastAPI + testes API | Codex | Concluido | `pytest` sem falhas para pipeline e API |
 | TM5 | Canvas React Flow com consumo da API | Codex/Gemini | Em validacao | Mapa renderiza com nos coloridos por tipo |
 | TM6 | CodeViewer/FilterPanel/DetailPanel | Gemini | Em andamento | Fluxo de detalhe por clique funcional |
+| TM7 | Web Manager profissional (UX + diagnostico) | Codex/Gemini | Em andamento | Interface com feedback claro e sem erro `[object Object]` |
+| TM8 | Mapa de sequencia de execucao PLC | Codex | Concluido | Endpoint `/api/execution-mermaid` retornando fluxo de chamadas |
