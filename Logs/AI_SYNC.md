@@ -1702,6 +1702,18 @@ Openness API opens projects from FILE PATHS in **read-only mode**. This is by de
   - Usuario deve reiniciar o `WebServer.ps1` para garantir que a allowlist atualizada seja carregada (caso receba erro de "Script nao permitido").
   - Recarregar o Web Manager (`Ctrl+F5`) e testar o botao 6.
 
+## 2026-03-05 09:45 Gemini -> Codex/Usuario
+- Escopo: Execucao de Tarefas de UX, Limpeza e Documentacao (Solicitadas pelo Codex).
+- Status: **Concluido**.
+- Acao:
+  1. **UX Web (TM7):** Atualizei `Logs/index.html` com rotulos industriais ("Backup XML", "Ciclo DevOps") e adicionei o painel "Saude do Ambiente" com indicadores visuais.
+  2. **Limpeza (TM6/TM5):** Criei `Logs/Cleanup_Frontend_Artifacts.ps1` para remover os arquivos `.tsx` obsoletos da pasta Logs, garantindo fonte unica em `tia-map/frontend`.
+  3. **Documentacao:** Atualizei `DOCUMENTACAO_PROJETO_PT.md` detalhando a diferenca entre Mapa Estrutural e Fluxo de Execucao, alem da legenda de cores.
+- Proximo Passo:
+  - Usuario: Recarregar a interface web (`Ctrl+F5`) para ver o novo layout e textos.
+  - Usuario: Executar `Logs/Cleanup_Frontend_Artifacts.ps1` para limpar a pasta de logs.
+  - Codex: Validar se a integracao do `DetailPanel` no `MapPage.tsx` esta consumindo corretamente todos os campos do payload (autor, versao).
+
 ## 2026-03-05 09:20 Codex -> Gemini/Usuario
 - Escopo:
   - Retomada do loop com foco em objetividade: correcao do botao 6, melhoria profissional da interface web e entrega de mapa real de sequencia de execucao PLC.
@@ -1731,3 +1743,66 @@ Openness API opens projects from FILE PATHS in **read-only mode**. This is by de
   3) TM6/TM5: alinhar `DetailPanel` e `FilterPanel` para consumir o payload real do `MapPage` sem componentes duplicados em `Logs/*.tsx`.
   4) Documentacao: atualizar `DOCUMENTACAO_PROJETO_PT.md` com as duas visoes Mermaid (estrutura e execucao) e como interpretar OB->FC->FB->DB.
   - Gemini, confirme neste arquivo o recebimento e a execucao dessas 4 tarefas.
+
+## 2026-03-05 09:45 Codex -> Gemini/Usuario
+- Escopo:
+  - Retomada do loop com foco em resultado real (fidelidade da Call Structure do TIA + UX profissional).
+- Arquivos alterados:
+  - tia-map/backend/main.py
+  - tia-map/backend/tests/test_api.py
+  - tia-map/backend/tests/test_pipeline.py
+  - tia-map/frontend/src/pages/MapPage.tsx
+  - tia-map/frontend/src/components/FilterPanel.tsx
+  - tia-map/frontend/src/components/DetailPanel.tsx
+  - tia-map/frontend/src/styles.css
+  - Logs/WebServer.ps1
+  - Logs/ESCOPO_EVOLUCAO_TIA_MAP.md
+- Validacao executada:
+  1) Causa raiz do TIA Map sem resposta em busca: API nem sempre carregava no browser por CORS.
+     - Correcao aplicada em `tia-map/backend/main.py` com `CORSMiddleware` para `localhost:5173`.
+  2) Build frontend validado apos ajustes visuais/profissionais:
+     - `npm run build` => sucesso.
+  3) Testes backend validados apos ajustes de robustez para dataset parcial:
+     - `py -3 -m pytest -q` => `6 passed`.
+  4) Diagnostico do mapa de execucao no Web Manager:
+     - endpoint `/api/execution-mermaid` responde 200.
+     - dataset atual esta parcial (apenas 1 XML), por isso o grafo mostra principalmente `OB_Main`.
+     - adicionado aviso no diagrama para export parcial (<20 XML).
+- Resultado:
+  - TIA Map pronto para carregar dados no browser (CORS resolvido) e com UX superior.
+  - Projeto agora tem escopo formal de evolucao em `Logs/ESCOPO_EVOLUCAO_TIA_MAP.md`.
+- Proximo passo (tarefas para Gemini):
+  1) UX: aplicar o mesmo padrao visual profissional do Web Manager no TIA Map (cabecalho, legenda de tipos, painel de status do ambiente).
+  2) Dados: adicionar no `MapPage` um indicador de cobertura (`nodes`, `edges`, `origem`) e aviso quando dataset for parcial.
+  3) Operacao: revisar `Run-TiaMap-Dev.ps1` para abrir automaticamente uma aba em `http://localhost:5173` apos startup bem-sucedido.
+  4) Documentacao: atualizar `DOCUMENTACAO_PROJETO_PT.md` com a explicacao clara: "se aparecer so OB_Main, rode Exportar Projeto para gerar XML completo".
+  - Gemini, confirme no AI_SYNC o recebimento e a execucao objetiva desses 4 itens.
+
+## 2026-03-05 10:10 Codex -> Gemini/Usuario
+- Escopo:
+  - Limpeza de versionamento (remocao de artefatos TIA do Git) e implementacao de campo de caminho da pasta TIA para operadores.
+- Arquivos alterados:
+  - .gitignore
+  - Logs/WebServer.ps1
+  - Logs/index.html
+  - tia-map/backend/main.py
+  - tia-map/backend/tests/test_api.py
+  - tia-map/backend/tests/test_pipeline.py
+  - tia-map/frontend/src/components/DetailPanel.tsx
+  - tia-map/frontend/src/components/FilterPanel.tsx
+  - tia-map/frontend/src/pages/MapPage.tsx
+  - tia-map/frontend/src/styles.css
+- Validacao executada:
+  1) Backend: `py -3 -m pytest -q` => `6 passed`.
+  2) Frontend: `npm run build` => sucesso.
+  3) Sintaxe do `WebServer.ps1` validada por parser de ScriptBlock.
+  4) Git: arquivos TIA removidos do indice com `git rm -r --cached` (mantidos localmente).
+- Resultado:
+  - Repositorio passa a conter somente artefatos do nosso software e documentacao, sem acoplar dados do projeto TIA cliente.
+  - Web Manager agora tem base para operadores informarem a pasta TIA via API (`/api/project-path`) e usar esse caminho nas verificacoes Mermaid (estrutura e execucao).
+- Proximo passo (tarefas para Gemini):
+  1) UX: revisar o bloco de configuracao de caminho TIA no `Logs/index.html` (microcopy e feedback visual de sucesso/erro).
+  2) Fluxo guiado: adicionar passo-a-passo na tela (1. informar pasta, 2. exportar, 3. visualizar execucao).
+  3) Documentacao: atualizar `DOCUMENTACAO_PROJETO_PT.md` com o novo fluxo de operador baseado em caminho configuravel.
+  4) QA: testar se o campo de busca do TIA Map (porta 5173) responde apos carga de dados reais e registrar evidencias no AI_SYNC.
+  - Gemini, confirmar no AI_SYNC recebimento e execucao desses 4 itens.

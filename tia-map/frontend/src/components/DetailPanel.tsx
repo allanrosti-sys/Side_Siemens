@@ -1,3 +1,4 @@
+﻿import type { CSSProperties } from "react";
 import CodeViewer from "./CodeViewer";
 import type { GraphNode } from "../types/graph";
 
@@ -6,18 +7,18 @@ interface DetailPanelProps {
   onClose: () => void;
 }
 
-function typeClass(blockType: string): string {
+function typeStyle(blockType: string): CSSProperties {
   switch (blockType) {
     case "OB":
-      return "bg-purple-100 text-purple-800 border-purple-200";
+      return { background: "#ede9fe", color: "#5b21b6", border: "1px solid #c4b5fd" };
     case "FB":
-      return "bg-blue-100 text-blue-800 border-blue-200";
+      return { background: "#e0f2fe", color: "#075985", border: "1px solid #7dd3fc" };
     case "FC":
-      return "bg-green-100 text-green-800 border-green-200";
+      return { background: "#dcfce7", color: "#166534", border: "1px solid #86efac" };
     case "DB":
-      return "bg-gray-100 text-gray-800 border-gray-200";
+      return { background: "#f1f5f9", color: "#334155", border: "1px solid #cbd5e1" };
     default:
-      return "bg-zinc-100 text-zinc-800 border-zinc-200";
+      return { background: "#f8fafc", color: "#334155", border: "1px solid #dbe4ef" };
   }
 }
 
@@ -27,41 +28,53 @@ export default function DetailPanel({ selectedNode, onClose }: DetailPanelProps)
   const data = selectedNode.data;
 
   return (
-    <div className="fixed right-0 top-0 z-20 flex h-full w-1/3 min-w-[500px] flex-col border-l border-gray-200 bg-white shadow-2xl">
-      <div className="flex items-start justify-between border-b border-gray-200 bg-gray-50 p-4">
+    <div
+      style={{
+        position: "fixed",
+        right: 0,
+        top: 0,
+        zIndex: 20,
+        width: "34%",
+        minWidth: 460,
+        height: "100%",
+        background: "#fff",
+        borderLeft: "1px solid #dbe4ef",
+        boxShadow: "-10px 0 24px rgba(15,23,42,.12)",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <div style={{ padding: 16, borderBottom: "1px solid #e2e8f0", background: "#f8fafc", display: "flex", justifyContent: "space-between" }}>
         <div>
-          <div className={`mb-2 inline-block rounded border px-2 py-0.5 text-xs font-bold ${typeClass(data.blockType)}`}>
+          <div style={{ display: "inline-block", padding: "2px 10px", borderRadius: 20, fontSize: 12, fontWeight: 700, ...typeStyle(data.blockType) }}>
             {data.blockType}
           </div>
-          <h2 className="break-all text-xl font-bold text-gray-800">{data.label}</h2>
-          {data.comment ? <p className="mt-1 text-sm text-gray-500">{data.comment}</p> : null}
+          <h2 style={{ margin: "10px 0 0", fontSize: 20 }}>{data.label}</h2>
+          {data.comment ? <p style={{ margin: "8px 0 0", color: "#64748b" }}>{data.comment}</p> : null}
         </div>
-        <button
-          onClick={onClose}
-          className="rounded p-1 text-xl leading-none text-gray-400 hover:bg-gray-200 hover:text-gray-600"
-        >
-          &times;
+        <button onClick={onClose} style={{ border: 0, background: "#e2e8f0", borderRadius: 6, width: 34, height: 34, cursor: "pointer" }}>
+          ✕
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 border-b border-gray-200 bg-white p-4 text-sm">
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, padding: 16, borderBottom: "1px solid #e2e8f0" }}>
         <div>
-          <span className="block text-xs uppercase tracking-wide text-gray-500">Autor</span>
-          <span className="font-medium text-gray-800">{data.author ?? "-"}</span>
+          <div style={{ color: "#64748b", fontSize: 11, textTransform: "uppercase" }}>Autor</div>
+          <div>{data.author ?? "-"}</div>
         </div>
         <div>
-          <span className="block text-xs uppercase tracking-wide text-gray-500">Versao</span>
-          <span className="font-medium text-gray-800">{data.version ?? "0.0"}</span>
+          <div style={{ color: "#64748b", fontSize: 11, textTransform: "uppercase" }}>Versao</div>
+          <div>{data.version ?? "0.0"}</div>
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col overflow-hidden bg-gray-50 p-4">
-        <h3 className="mb-2 text-sm font-bold uppercase tracking-wide text-gray-700">Logica SCL</h3>
-        <div className="flex-1 overflow-hidden rounded border border-gray-300 shadow-inner">
+      <div style={{ flex: 1, padding: 16, background: "#f8fafc", overflow: "hidden" }}>
+        <div style={{ fontSize: 12, textTransform: "uppercase", color: "#334155", marginBottom: 8, fontWeight: 700 }}>Logica SCL</div>
+        <div style={{ height: "100%", border: "1px solid #d1d5db", borderRadius: 8, overflow: "hidden" }}>
           {data.code ? (
             <CodeViewer code={data.code} readOnly />
           ) : (
-            <div className="flex h-full items-center justify-center bg-gray-100 italic text-gray-400">
+            <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8" }}>
               Codigo nao disponivel.
             </div>
           )}
@@ -70,4 +83,3 @@ export default function DetailPanel({ selectedNode, onClose }: DetailPanelProps)
     </div>
   );
 }
-

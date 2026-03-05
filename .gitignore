@@ -38,6 +38,12 @@ Thumbs.db
 System/*.plf
 System/*.idx
 System/~PEData.*
+AdditionalFiles/
+IM/
+UserFiles/
+Vci/
+XRef/
+*.info
 
 # TIA Map (frontend/backend) - artefatos locais
 tia-map/frontend/node_modules/

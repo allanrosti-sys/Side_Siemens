@@ -19,6 +19,7 @@ export default function MapPage() {
   const [edges, setEdges, onEdgesChange] = useEdgesState<GraphEdge>([]);
   const [originalNodes, setOriginalNodes] = useState<GraphNode[]>([]);
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const [filters, setFilters] = useState<FilterState>({
     searchTerm: "",
@@ -40,8 +41,10 @@ export default function MapPage() {
         setNodes((data.nodes ?? []) as GraphNode[]);
         setOriginalNodes((data.nodes ?? []) as GraphNode[]);
         setEdges((data.edges ?? []) as GraphEdge[]);
+        setLoadError(null);
       } catch (error) {
         console.error("Erro ao carregar grafo:", error);
+        setLoadError(String(error));
       }
     };
 
@@ -84,9 +87,18 @@ export default function MapPage() {
   }, []);
 
   return (
-    <div className="h-screen w-full overflow-hidden bg-gray-50">
-      <div className="relative h-full w-full">
+    <div className="tm-page">
+      <div className="tm-canvas">
         <FilterPanel onFilterChange={setFilters} />
+        {loadError ? (
+          <div className="tm-banner error">
+            Erro ao conectar no backend (porta 8001). Verifique o launcher do TIA Map.
+          </div>
+        ) : (
+          <div className="tm-banner">
+            Blocos visiveis: {filteredNodes.length} | Conexoes: {filteredEdges.length}
+          </div>
+        )}
 
         <ReactFlow
           nodes={filteredNodes}

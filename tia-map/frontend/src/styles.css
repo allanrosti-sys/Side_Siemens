@@ -1,7 +1,7 @@
 :root {
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   color: #0f172a;
-  background-color: #e2e8f0;
+  background: linear-gradient(180deg, #f5f8fc 0%, #e9eff7 100%);
 }
 
 * {
@@ -16,3 +16,80 @@ body,
   margin: 0;
 }
 
+.tm-page {
+  width: 100%;
+  height: 100%;
+}
+
+.tm-canvas {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.tm-panel {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 10;
+  width: 330px;
+  background: #ffffff;
+  border: 1px solid #dbe4ef;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+  padding: 14px;
+}
+
+.tm-title {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  color: #0b4f74;
+}
+
+.tm-subtitle {
+  margin: 0 0 12px 0;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.tm-field {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+
+.tm-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 14px;
+}
+
+.tm-chip {
+  border: 1px solid #dbe4ef;
+  border-radius: 20px;
+  padding: 4px 10px;
+  background: #f8fafc;
+}
+
+.tm-banner {
+  position: absolute;
+  right: 14px;
+  top: 14px;
+  z-index: 9;
+  background: #ffffff;
+  border: 1px solid #dbe4ef;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.1);
+}
+
+.tm-banner.error {
+  color: #b91c1c;
+  border-color: #fecaca;
+  background: #fff1f2;
+}

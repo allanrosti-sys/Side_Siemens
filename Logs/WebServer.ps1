@@ -21,6 +21,47 @@ Write-Host "Pressione Ctrl+C para parar."
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $projectRoot = Split-Path -Parent $scriptRoot
 $exportRoot = Join-Path $scriptRoot "ControlModules_Export"
+$settingsFile = Join-Path $scriptRoot "web_settings.json"
+$selectedTiaPath = $null
+
+if (Test-Path $settingsFile) {
+    try {
+        $settings = Get-Content -Path $settingsFile -Raw -Encoding UTF8 | ConvertFrom-Json
+        if ($settings.tiaPath) {
+            $selectedTiaPath = [string]$settings.tiaPath
+        }
+    } catch {
+        Write-Warning "Falha ao ler web_settings.json: $($_.Exception.Message)"
+    }
+}
+
+function Save-WebSettings {
+    param([string]$TiaPath)
+    $obj = @{ tiaPath = $TiaPath }
+    $json = $obj | ConvertTo-Json -Compress
+    Set-Content -Path $settingsFile -Value $json -Encoding UTF8
+}
+
+function Resolve-ExportPath {
+    param([string]$BasePath, [string]$FallbackPath)
+
+    $candidates = New-Object System.Collections.Generic.List[string]
+    if (-not [string]::IsNullOrWhiteSpace($BasePath)) {
+        $candidates.Add((Join-Path $BasePath "Logs\\ControlModules_Export"))
+        $candidates.Add((Join-Path $BasePath "ControlModules_Export"))
+        $candidates.Add((Join-Path $BasePath "Logs"))
+        $candidates.Add($BasePath)
+    }
+    $candidates.Add($FallbackPath)
+
+    foreach ($candidate in $candidates) {
+        if (-not (Test-Path $candidate)) { continue }
+        $xmlCount = (Get-ChildItem -Path $candidate -Filter *.xml -File -Recurse -ErrorAction SilentlyContinue | Measure-Object).Count
+        if ($xmlCount -gt 0) { return $candidate }
+    }
+
+    return $FallbackPath
+}
 
 # --- FUNCAO: GERAR DIAGRAMA MERMAID ---
 # Gera a definicao de grafico para o Mermaid.js baseada na estrutura de pastas exportada
@@ -94,8 +135,12 @@ function New-ExecutionMermaid {
         $lines.Add("  ROOT --> EMPTY[`"Sem XMLs para analisar`"]")
         return ($lines -join "`n")
     }
+    if ($xmlFiles.Count -lt 20) {
+        $lines.Add("  ROOT --> WARN[`"Atencao: export parcial ($($xmlFiles.Count) XML). Rode Exportar Projeto para visao completa.`"]")
+    }
 
     $nodeMap = @{}
+    $incomingCount = @{}
     $edgeSet = New-Object 'System.Collections.Generic.HashSet[string]'
 
     foreach ($file in $xmlFiles) {
@@ -145,6 +190,8 @@ function New-ExecutionMermaid {
             $edgeKey = "$callerId|$targetId"
             if ($edgeSet.Add($edgeKey)) {
                 $lines.Add("  $callerId --> $targetId")
+                if (-not $incomingCount.ContainsKey($targetId)) { $incomingCount[$targetId] = 0 }
+                $incomingCount[$targetId]++
             }
 
             # Mapeia instancia DB dentro da chamada (quando existir).
@@ -159,8 +206,24 @@ function New-ExecutionMermaid {
                     $dbEdgeKey = "$callerId|$dbId"
                     if ($edgeSet.Add($dbEdgeKey)) {
                         $lines.Add("  $callerId --> $dbId")
+                        if (-not $incomingCount.ContainsKey($dbId)) { $incomingCount[$dbId] = 0 }
+                        $incomingCount[$dbId]++
                     }
                 }
+            }
+        }
+    }
+
+    # Se houver blocos sem predecessores, liga na raiz para nao ficarem perdidos no diagrama.
+    foreach ($nodeId in $nodeMap.Keys) {
+        $label = $nodeMap[$nodeId]
+        $isOb = $label.StartsWith("OB ")
+        if ($isOb) { continue }
+        $incoming = if ($incomingCount.ContainsKey($nodeId)) { [int]$incomingCount[$nodeId] } else { 0 }
+        if ($incoming -eq 0) {
+            $edgeKey = "ROOT|$nodeId"
+            if ($edgeSet.Add($edgeKey)) {
+                $lines.Add("  ROOT --> $nodeId")
             }
         }
     }
@@ -273,6 +336,46 @@ while ($listener.IsListening) {
                 $contentType = "application/json; charset=utf-8"
             }
         }
+        # ROTA: Configuracao de caminho TIA (/api/project-path)
+        elseif ($path -eq "/api/project-path" -and $method -eq "GET") {
+            $resolvedPath = Resolve-ExportPath -BasePath $selectedTiaPath -FallbackPath $exportRoot
+            $xmlCount = (Get-ChildItem -Path $resolvedPath -Filter *.xml -File -Recurse -ErrorAction SilentlyContinue | Measure-Object).Count
+            $content = (@{
+                status = "success"
+                tiaPath = $selectedTiaPath
+                resolvedExportPath = $resolvedPath
+                xmlCount = $xmlCount
+            } | ConvertTo-Json -Compress)
+            $contentType = "application/json; charset=utf-8"
+        }
+        elseif ($path -eq "/api/project-path" -and $method -eq "POST") {
+            $reader = [System.IO.StreamReader]::new($request.InputStream, [System.Text.Encoding]::UTF8)
+            $body = $reader.ReadToEnd()
+            $reader.Dispose()
+
+            $json = $body | ConvertFrom-Json
+            $candidatePath = ([string]$json.path).Trim()
+
+            if ([string]::IsNullOrWhiteSpace($candidatePath) -or -not (Test-Path $candidatePath)) {
+                $content = (@{ status = "error"; message = "Caminho invalido ou inexistente." } | ConvertTo-Json -Compress)
+                $statusCode = 400
+                $contentType = "application/json; charset=utf-8"
+            } else {
+                $selectedTiaPath = $candidatePath
+                Save-WebSettings -TiaPath $selectedTiaPath
+
+                $resolvedPath = Resolve-ExportPath -BasePath $selectedTiaPath -FallbackPath $exportRoot
+                $xmlCount = (Get-ChildItem -Path $resolvedPath -Filter *.xml -File -Recurse -ErrorAction SilentlyContinue | Measure-Object).Count
+                $content = (@{
+                    status = "success"
+                    message = "Caminho salvo com sucesso."
+                    tiaPath = $selectedTiaPath
+                    resolvedExportPath = $resolvedPath
+                    xmlCount = $xmlCount
+                } | ConvertTo-Json -Compress)
+                $contentType = "application/json; charset=utf-8"
+            }
+        }
         # ROTA: Obter Logs (/api/logs)
         elseif ($path -eq "/api/logs") {
             $logFile = Get-ChildItem -Path $scriptRoot -Filter "run_output_*.txt" -File -ErrorAction SilentlyContinue |
@@ -296,13 +399,15 @@ while ($listener.IsListening) {
         }
         # ROTA: Obter Diagrama Mermaid (/api/mermaid)
         elseif ($path -eq "/api/mermaid") {
-            $diagram = New-ProjectMermaid -ExportPath $exportRoot
+            $resolvedPath = Resolve-ExportPath -BasePath $selectedTiaPath -FallbackPath $exportRoot
+            $diagram = New-ProjectMermaid -ExportPath $resolvedPath
             $content = (@{ diagram = $diagram } | ConvertTo-Json -Compress)
             $contentType = "application/json; charset=utf-8"
         }
         # ROTA: Obter Diagrama de Execucao (/api/execution-mermaid)
         elseif ($path -eq "/api/execution-mermaid") {
-            $diagram = New-ExecutionMermaid -ExportPath $exportRoot
+            $resolvedPath = Resolve-ExportPath -BasePath $selectedTiaPath -FallbackPath $exportRoot
+            $diagram = New-ExecutionMermaid -ExportPath $resolvedPath
             $content = (@{ diagram = $diagram } | ConvertTo-Json -Compress)
             $contentType = "application/json; charset=utf-8"
         }

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TIA Portal Web Manager</title>
+    <title>Painel de Operacao TIA</title>
     <style>
         :root {
             --bg: #eef2f7;
@@ -109,6 +109,18 @@
             display:block; margin-top:10px; padding:12px; background:#0369a1; color:white;
             text-align:center; border-radius:8px; text-decoration:none; font-weight:600;
         }
+        .health-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px; }
+        .health-item { background: #f1f5f9; padding: 10px; border-radius: 6px; text-align: center; font-size: 12px; border: 1px solid #cbd5e1; }
+        .health-label { display: block; color: #64748b; margin-bottom: 4px; font-weight: 600; }
+        .health-val { font-weight: bold; color: #0f172a; }
+        .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
+        .dot.ok { background-color: #22c55e; } .dot.nok { background-color: #ef4444; }
+        .path-box { margin: 10px 0 14px; padding: 10px; border: 1px solid #dbe4ef; border-radius: 8px; background: #f8fafc; }
+        .path-box label { display:block; font-size:12px; font-weight:700; color:#334155; margin-bottom:6px; }
+        .path-row { display:flex; gap:8px; }
+        .path-row input { flex:1; border:1px solid #cbd5e1; border-radius:8px; padding:9px 10px; font-size:13px; }
+        .path-row .small-btn { margin:0; }
+        .path-info { font-size:12px; color:#475569; margin-top:6px; white-space: pre-wrap; }
         @media (max-width: 860px) {
             .actions { grid-template-columns: 1fr; }
             body { padding: 14px; }
@@ -116,19 +128,41 @@
     </style>
 </head>
 <body>
-    <h1>TIA Portal Web Manager</h1>
-    <p class="subtitle">Painel profissional para operacao, diagnostico e analise de fluxo (OB/FC/FB/DB).</p>
+    <h1>Painel de Operacao TIA</h1>
+    <p class="subtitle">Gestao de ciclo de vida e analise de software PLC (S7-1500).</p>
 
     <div class="card">
-        <div class="status" id="status-text">Status: pronto.</div>
+        <div class="health-grid">
+            <div class="health-item">
+                <span class="health-label">WEBSERVER</span>
+                <span class="health-val"><span class="dot ok"></span>Online (8080)</span>
+            </div>
+            <div class="health-item">
+                <span class="health-label">TIA MAP (API)</span>
+                <span class="health-val">Porta 8001</span>
+            </div>
+            <div class="health-item">
+                <span class="health-label">TIA MAP (UI)</span>
+                <span class="health-val">Porta 5173</span>
+            </div>
+        </div>
+        <div class="status" id="status-text">Sistema pronto.</div>
+        <div class="path-box">
+            <label for="tia-path-input">Caminho da pasta do projeto TIA</label>
+            <div class="path-row">
+                <input id="tia-path-input" type="text" placeholder="Ex.: C:\Projetos\MeuProjetoTIA" />
+                <button class="small-btn" onclick="saveTiaPath()">Salvar</button>
+            </div>
+            <div id="tia-path-info" class="path-info">Caminho nao configurado.</div>
+        </div>
         <div class="actions">
-            <button class="btn-export" onclick="runScript('RunExporterWithAttach.ps1')">1. Exportar Projeto</button>
-            <button class="btn-import" onclick="runScript('Import-New-Blocks.ps1')">2. Importar Blocos</button>
-            <button class="btn-cycle" onclick="runScript('Run-Full-Cycle.ps1')">3. Executar Ciclo Completo</button>
-            <button class="btn-doc" onclick="runScript('Generate-Documentation.ps1')">4. Gerar Documentacao</button>
-            <button class="btn-map" onclick="openStructureMap()">5. Estrutura de Pastas (Mermaid)</button>
-            <button class="btn-map" onclick="openExecutionMap()">6. Sequencia de Execucao PLC</button>
-            <button class="btn-dev" onclick="runScript('Run-TiaMap-Dev.ps1')">7. Iniciar TIA Map (Dev)</button>
+            <button class="btn-export" onclick="runScript('RunExporterWithAttach.ps1')">1. Exportar (Backup XML)</button>
+            <button class="btn-import" onclick="runScript('Import-New-Blocks.ps1')">2. Importar (SCL/UDT)</button>
+            <button class="btn-cycle" onclick="runScript('Run-Full-Cycle.ps1')">3. Ciclo DevOps (Full)</button>
+            <button class="btn-doc" onclick="runScript('Generate-Documentation.ps1')">4. Documentacao (HTML)</button>
+            <button class="btn-map" onclick="openStructureMap()">5. Mapa Estrutural</button>
+            <button class="btn-map" onclick="openExecutionMap()">6. Fluxo de Execucao</button>
+            <button class="btn-dev" onclick="runScript('Run-TiaMap-Dev.ps1')">7. TIA Map (App)</button>
         </div>
         <div id="tia-map-link-container"></div>
     </div>
@@ -205,6 +239,44 @@
                 }
             } catch (error) {
                 setStatus(`Erro de conexao: ${error}`, 'error');
+            }
+        }
+
+        async function loadTiaPath() {
+            try {
+                const response = await fetch('/api/project-path');
+                const data = await parseJsonSafe(response);
+                const input = document.getElementById('tia-path-input');
+                const info = document.getElementById('tia-path-info');
+                input.value = data.tiaPath || '';
+                info.innerText = `Origem: ${data.resolvedExportPath || '-'} | XMLs: ${data.xmlCount ?? 0}`;
+            } catch (error) {
+                document.getElementById('tia-path-info').innerText = `Falha ao carregar caminho: ${error}`;
+            }
+        }
+
+        async function saveTiaPath() {
+            const input = document.getElementById('tia-path-input');
+            const pathValue = (input.value || '').trim();
+            if (!pathValue) {
+                setStatus('Informe um caminho de pasta TIA antes de salvar.', 'error');
+                return;
+            }
+            try {
+                const response = await fetch('/api/project-path', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ path: pathValue })
+                });
+                const data = await parseJsonSafe(response);
+                if (data.status === 'success') {
+                    setStatus('Caminho TIA salvo com sucesso.', 'success');
+                    document.getElementById('tia-path-info').innerText = `Origem: ${data.resolvedExportPath || '-'} | XMLs: ${data.xmlCount ?? 0}`;
+                } else {
+                    setStatus(`Erro ao salvar caminho: ${data.message || 'falha desconhecida'}`, 'error');
+                }
+            } catch (error) {
+                setStatus(`Erro de conexao ao salvar caminho: ${error}`, 'error');
             }
         }
 
@@ -291,6 +363,7 @@
             }
         };
 
+        loadTiaPath();
         fetchLogs();
     </script>
 </body>
