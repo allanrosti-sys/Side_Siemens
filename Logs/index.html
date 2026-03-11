@@ -765,6 +765,7 @@
             }
 
             const isNonBlocking = scriptName === "Run-TiaMap-Dev.ps1";
+            const isDocumentation = scriptName === "Generate-Documentation.ps1";
             if (!isNonBlocking) {
                 setActionRunning(true);
             }
@@ -820,7 +821,9 @@
                 stopLogPolling();
             } finally {
                 // Mantem a acao visualmente 'rodando' enquanto o polling acontece.
-                if (!isNonBlocking) {
+                if (isDocumentation) {
+                    setActionRunning(false);
+                } else if (!isNonBlocking) {
                     setTimeout(() => {
                         setActionRunning(false);
                         stopLogPolling();
@@ -940,9 +943,7 @@
                 }
                 
                 let pollCount = 0;
-                let unchangedCount = 0;
-                const maxPolls = 30; // 30 * 1.5s = 45s
-                const maxUnchanged = 4; // 6s sem mudanca -> assume cancelamento
+                const maxPolls = 40; // 40 * 1.5s = 60s
                 activePathPoller = setInterval(async () => {
                     try {
                         const pathResponse = await fetch("/api/project-path");
@@ -955,12 +956,11 @@
                             setActionRunning(false);
                             return;
                         }
-                        unchangedCount++;
                     } catch (e) {
                         // Ignora erros de polling, continua tentando
                     }
                     pollCount++;
-                    if (unchangedCount >= maxUnchanged || pollCount >= maxPolls) {
+                    if (pollCount >= maxPolls) {
                         stopPathPolling();
                         showToast("Selecao de pasta cancelada ou expirou.", "info");
                         loadProjectSettings();

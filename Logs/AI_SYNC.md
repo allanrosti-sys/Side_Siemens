@@ -159,3 +159,31 @@
     - Conversao basica de XIC/XIO + OTE para IF/END_IF.
 - Proximo passo:
   - Recarregar o TIA Map e abrir a mesma rotina para validar a visualizacao.
+## 2026-03-11 17:10 Codex -> Usuario/Gemini
+- Escopo:
+  - Consolidar registro das principais melhorias recentes no painel web, Rockwell e TIA Map.
+- Principais melhorias entregues:
+  1) Painel Web:
+     - Selecao de origem com popup em primeiro plano (TopMost).
+     - Polling de selecao com timeout estavel (60s) e sem travar a UI ao cancelar.
+     - Botao do Puchta PLC Insight no mesmo padrao visual dos demais.
+     - TiaMap-Dev tratado como nao-bloqueante (nao desativa outros botoes).
+     - Documentacao libera a UI imediatamente apos abrir o HTML.
+     - Roteamento de Documentacao Siemens/Rockwell corrigido (cada HTML abre o seu).
+  2) Rockwell:
+     - Gerador de documentacao `Generate-Documentation-Rockwell.ps1`.
+     - Parser L5K/L5X com melhor decodificacao de entidades HTML.
+     - Conversao RC/N -> ST no visualizador, mantendo tags como comentarios.
+  3) Siemens:
+     - Mapas e chamadas seguem funcionais com vendor definido.
+- Arquivos chave alterados recentemente:
+  - `Logs/index.html`
+  - `Logs/WebServer.ps1`
+  - `Logs/Start-WebPanel.ps1`
+  - `Logs/Select-ProjectPath.ps1`
+  - `Logs/Run-TiaMap-Dev.ps1`
+  - `Generate-Documentation-Rockwell.ps1`
+  - `tia-map/frontend/src/components/CodeViewer.tsx`
+  - `tia-map/backend/core/rockwell_parser.py`
+- Proximo passo:
+  - Atualizar DOCUMENTACAO_PROJETO_PT.md com resumo operacional e fluxo multivendor.

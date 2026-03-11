@@ -142,7 +142,8 @@ if ($backendUp) {
         $backendDataPath = $DataPath
     }
     $backendCmd = "cd '$backendPath'; `$env:Path='$effectivePath'; `$env:TIA_MAP_DATA_PATH='$backendDataPath'; $pythonExe -m uvicorn main:app --reload --port $backendPort"
-    Start-Process powershell -ArgumentList "-NoExit", "-Command", $backendCmd
+    # Backend em janela oculta para nao abrir PowerShell visivel.
+    Start-Process powershell -ArgumentList "-NoProfile", "-Command", $backendCmd -WindowStyle Hidden
 }
 
 if ($frontendUp) {
@@ -150,7 +151,8 @@ if ($frontendUp) {
 } else {
     Write-Host "Iniciando frontend (Vite) na porta $frontendPort..." -ForegroundColor Yellow
     $frontendCmd = "cd '$frontendPath'; `$env:Path='$effectivePath'; & '$npmExe' run dev"
-    Start-Process powershell -ArgumentList "-NoExit", "-Command", $frontendCmd
+    # Frontend em janela oculta para nao abrir PowerShell visivel.
+    Start-Process powershell -ArgumentList "-NoProfile", "-Command", $frontendCmd -WindowStyle Hidden
 }
 
 Write-Host ""

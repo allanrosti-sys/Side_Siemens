@@ -965,7 +965,8 @@ while ($listener.IsListening) {
                     "-File", $selectorScript,
                     "-Port", $Port
                 )
-                Start-Process powershell -WorkingDirectory $scriptRoot -ArgumentList $args | Out-Null
+                # Abre o seletor com janela oculta, mantendo apenas o dialogo visivel.
+                Start-Process powershell -WorkingDirectory $scriptRoot -ArgumentList $args -WindowStyle Hidden | Out-Null
                 $content = (@{ status = "pending"; message = "Dialogo de selecao de pasta iniciado." } | ConvertTo-Json -Compress)
                 $statusCode = 202 # Accepted
             } else {
@@ -984,7 +985,8 @@ while ($listener.IsListening) {
                     "-ExecutionPolicy", "Bypass",
                     "-File", $selectorScript
                 )
-                Start-Process powershell -WorkingDirectory $scriptRoot -ArgumentList $args | Out-Null
+                # Abre o seletor com janela oculta, mantendo apenas o dialogo visivel.
+                Start-Process powershell -WorkingDirectory $scriptRoot -ArgumentList $args -WindowStyle Hidden | Out-Null
                 $content = (@{ status = "pending"; message = "Dialogo de selecao de pasta iniciado." } | ConvertTo-Json -Compress)
                 $statusCode = 202 # Accepted
             } else {
@@ -1027,7 +1029,8 @@ while ($listener.IsListening) {
             
             # Inicia o script de startup (que mata este processo e sobe um novo)
             $startScript = Join-Path $scriptRoot "Start-WebPanel.ps1"
-            Start-Process powershell -ArgumentList "-ExecutionPolicy Bypass -File `"$startScript`" -Port $Port"
+            # Reinicia o servidor em janela oculta.
+            Start-Process powershell -ArgumentList "-ExecutionPolicy Bypass -File `"$startScript`" -Port $Port" -WindowStyle Hidden
             
             $listener.Stop()
             exit

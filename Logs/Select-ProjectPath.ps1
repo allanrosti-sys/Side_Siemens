@@ -32,8 +32,16 @@ function Show-FolderBrowserDialog {
             catch {}
         }
         
+        # Mostra o dialogo em primeiro plano para evitar ficar escondido atras do browser.
+        $owner = New-Object System.Windows.Forms.Form
+        $owner.TopMost = $true
+        $owner.StartPosition = 'CenterScreen'
+        $owner.ShowInTaskbar = $false
+        $owner.Opacity = 0
+        $owner.Show()
+
         # Mostra o dialogo e so procede se o usuario clicar 'OK'.
-        $result = $dialog.ShowDialog()
+        $result = $dialog.ShowDialog($owner)
         if ($result -eq 'OK') {
             # O vendor atual e lido para ser enviado junto com o caminho.
             $currentVendor = "auto"
@@ -65,6 +73,10 @@ function Show-FolderBrowserDialog {
         # Erros sao silenciados para nao mostrar popups de erro caso o usuario cancele.
     }
     finally {
+        if ($owner) {
+            $owner.Close()
+            $owner.Dispose()
+        }
         if ($dialog) {
             $dialog.Dispose()
         }

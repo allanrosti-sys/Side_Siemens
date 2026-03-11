@@ -45,12 +45,13 @@ if ($selectedPort -ne $Port) {
 }
 
 $argList = @(
-    '-NoExit',
+    '-NoProfile',
     '-ExecutionPolicy', 'Bypass',
     '-File', $webServerScript,
     '-Port', $selectedPort
 )
-Start-Process powershell -WorkingDirectory $projectRoot -ArgumentList $argList
+# Inicia o servidor em janela oculta para nao incomodar o usuario final.
+Start-Process powershell -WorkingDirectory $projectRoot -ArgumentList $argList -WindowStyle Hidden
 
 Start-Sleep -Seconds 2
 
