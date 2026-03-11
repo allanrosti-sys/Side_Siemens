@@ -187,3 +187,16 @@
   - `tia-map/backend/core/rockwell_parser.py`
 - Proximo passo:
   - Atualizar DOCUMENTACAO_PROJETO_PT.md com resumo operacional e fluxo multivendor.
+
+## 2026-03-11 17:35 Codex -> Usuario/Gemini
+- Escopo:
+  - Melhorar o interpretador Siemens (XML -> pseudo-SCL) no CodeViewer para blocos que nao possuem logica exportada.
+- Correcoes aplicadas:
+  - `tia-map/frontend/src/components/CodeViewer.tsx`
+    - Agora considera apenas as `Section` de primeiro nivel (Interface -> Sections -> Section), evitando misturar com Sections internas de tipos estruturados.
+    - Comentarios e StartValue/DefaultValue agora nao "vazam" de membros aninhados (ex.: estruturas dentro de `HMI_Status`).
+    - Normalizacao de tipos com aspas/escape (ex.: `\"_Tipo\"` ou `&quot;_Tipo&quot;`).
+- Validacao executada:
+  - `npm.cmd --prefix tia-map\\frontend run build` (build OK).
+- Proximo passo:
+  - Gemini/Usuario: validar um FB/FC que antes abria como XML puro (apenas Interface) e confirmar que agora aparece como pseudo-SCL legivel.

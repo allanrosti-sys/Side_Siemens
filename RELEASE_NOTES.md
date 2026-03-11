@@ -12,6 +12,7 @@
 - Botao "Abrir Puchta PLC Insight" alinhado ao padrao visual do painel.
 - Execucoes auxiliares em janelas ocultas (nao exibem PowerShell).
 - Correcoes de roteamento de documentacao (Siemens/Rockwell).
+- TIA Map: fallback Siemens (XML com apenas Interface) aprimorado para exibir pseudo-SCL legivel no painel lateral.
 
 ### Notas
 - Rockwell requer arquivo L5K/L5X exportado previamente.
