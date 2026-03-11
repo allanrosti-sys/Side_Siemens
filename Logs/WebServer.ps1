@@ -548,6 +548,16 @@ while ($listener.IsListening) {
                 $statusCode = 404
             }
         }
+        # ROTA: Visualizador de Mermaid em nova aba (para diagramas grandes)
+        elseif ($path -eq "/mermaid.html") {
+            $viewerPath = Join-Path $scriptRoot "mermaid_viewer.html"
+            if (Test-Path $viewerPath) {
+                $content = [System.IO.File]::ReadAllText($viewerPath, [System.Text.Encoding]::UTF8)
+            } else {
+                $content = "<h1>Erro: mermaid_viewer.html nao encontrado</h1>"
+                $statusCode = 404
+            }
+        }
         # ROTA: Documento HTML gerado (Siemens ou Rockwell conforme URL)
         elseif ($path -eq "/DocumentacaoDoProjeto.html") {
             $docCandidates = @(

@@ -469,6 +469,7 @@
         <div class="log-container" id="log-container">Aguardando logs...</div>
     </div>
 
+    <!-- Modal mantido por compatibilidade, mas o fluxo principal abre diagramas em nova aba. -->
     <div id="structureModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -1024,31 +1025,10 @@
         }
 
         async function renderMermaidFromEndpoint(endpoint, title) {
-            DOMElements.modal.style.display = "block";
-            DOMElements.modalTitle.textContent = title;
-            DOMElements.mermaidContainer.innerHTML = "<h4>Carregando diagrama...</h4>";
-
-            try {
-                const response = await fetch(endpoint);
-                const data = await parseJsonSafe(response);
-                const definition = data.diagram || 'graph TD\n  A["Diagrama nao pode ser gerado"];';
-                const { svg } = await mermaid.render(`mermaid-${Date.now()}`, definition);
-                DOMElements.mermaidContainer.innerHTML = svg;
-                
-                const svgElement = DOMElements.mermaidContainer.querySelector('svg');
-                if (svgElement) {
-                    panZoomInstance = svgPanZoom(svgElement, {
-                        zoomEnabled: true,
-                        controlIconsEnabled: false, // Desabilita icones padrao
-                        fit: true,
-                        center: true,
-                        minZoom: 0.01,
-                        maxZoom: 100
-                    });
-                }
-            } catch (error) {
-                DOMElements.mermaidContainer.innerHTML = `<h4 style="color:#c53030">Erro ao gerar diagrama</h4><pre>${error.message}</pre>`;
-            }
+            // Para projetos grandes, abrir em nova aba melhora a navegacao e evita popup limitado.
+            const mode = endpoint.includes("execution-mermaid") ? "execution" : "structure";
+            const url = `/mermaid.html?mode=${encodeURIComponent(mode)}`;
+            window.open(url, "_blank");
         }
 
         function openStructureMap() {
