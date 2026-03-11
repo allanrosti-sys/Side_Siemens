@@ -9,7 +9,7 @@ $projectRoot = if ($PSScriptRoot) { Split-Path -Path $PSScriptRoot -Parent } els
 $backendPath = Join-Path $projectRoot "tia-map\backend"
 $frontendPath = Join-Path $projectRoot "tia-map\frontend"
 
-$backendPort = 8011
+$backendPort = 8021
 $frontendPort = 5173
 
 Write-Host "=== TIA MAP LAUNCHER ===" -ForegroundColor Cyan

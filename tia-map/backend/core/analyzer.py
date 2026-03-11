@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from collections import defaultdict
 
@@ -15,10 +15,14 @@ def _aliases_for_block(block: Block) -> set[str]:
     add(block.name)
     add(block.constant_name)
     add(block.source_file.stem)
+    add(block.container_name)
 
-    # Normaliza padrao "FB_xxx" / "FC_xxx" / "OB_xxx".
+    if block.container_name:
+        add(f'{block.container_name}_{block.name}')
+        add(f'{block.container_name}:{block.name}')
+
     for candidate in list(aliases):
-        for prefix in ("fb_", "fc_", "ob_"):
+        for prefix in ('fb_', 'fc_', 'ob_'):
             if candidate.startswith(prefix):
                 add(candidate[len(prefix) :])
 
@@ -55,13 +59,13 @@ def build_call_edges(blocks: list[Block]) -> tuple[list[Edge], dict[str, str]]:
             target_block = _resolve_target(call.call_name, call.call_type, index)
             if target_block is not None:
                 target_id = target_block.id
-                label = f"{call.call_type} {call.call_name}"
+                label = f'{call.call_type} {call.call_name}'
             else:
-                target_id = f"external:{call.call_type}:{call.call_name}".lower()
-                label = f"EXTERNO {call.call_type} {call.call_name}"
+                target_id = f'external:{call.call_type}:{call.call_name}'.lower()
+                label = f'EXTERNO {call.call_type} {call.call_name}'
                 external_nodes[target_id] = call.call_name
 
-            key = (source_block.id, target_id, "call", label)
+            key = (source_block.id, target_id, 'call', label)
             if key in seen:
                 continue
             seen.add(key)
@@ -70,16 +74,16 @@ def build_call_edges(blocks: list[Block]) -> tuple[list[Edge], dict[str, str]]:
                 Edge(
                     source=source_block.id,
                     target=target_id,
-                    kind="call",
+                    kind='call',
                     label=label,
                     metadata={
-                        "call_name": call.call_name,
-                        "call_type": call.call_type,
-                        "instance_name": call.instance_name,
-                        "instance_db_number": call.instance_db_number,
+                        'call_name': call.call_name,
+                        'call_type': call.call_type,
+                        'instance_name': call.instance_name,
+                        'instance_db_number': call.instance_db_number,
+                        **call.metadata,
                     },
                 )
             )
 
     return edges, external_nodes
-

@@ -1,47 +1,92 @@
-﻿# Quadro Oficial de Tarefas (Team Lead: Gemini / Allan Rostirolla)
+# Quadro Oficial de Tarefas (Team Lead: Gemini / Allan Rostirolla)
 
-## STATUS DO PROJETO: 🏁 ENTREGUE (v1.0)
+## Status do Projeto
+- Produto oficial: `Puchta PLC Insight`
+- Nome legado: `TIA Map`
+- Fonte oficial de sincronizacao: `Logs/AI_SYNC.md`
+- Quadro oficial de execucao: este arquivo
+- Toda atualizacao deve usar portugues e conter evidencia de validacao
 
-- Fonte oficial de status: `Logs/AI_SYNC.md`.
-- Quadro oficial de execucao: este arquivo.
-- Toda atualizacao deve usar portugues e conter evidencia de validacao.
+## Definicoes operacionais vigentes
+- O produto agora e multi-vendor: `Siemens` e `Rockwell`
+- A escolha de vendor deve ocorrer antes da selecao da pasta/projeto
+- O mapa deve herdar o vendor escolhido, sem pedir essa decisao novamente dentro da tela
+- A interface principal deve passar a refletir o novo nome do produto
+- Toda analise nova deve validar encoding antes de gerar Mermaid
 
-## Sprint Atual: Executavel Robusto v20
+## Sprint Atual: Reorganizacao da Interface Principal
 
 | ID | Tarefa | Dono | Status | Criterio de Aceite |
 |---|---|---|---|---|
-| T1 | Definir binario oficial unico | Codex | Concluido | Nome unico do exe confirmado no AI_SYNC |
-| T2 | Definir script oficial unico de execucao | Codex | Concluido | Um unico `.ps1` oficial confirmado |
-| T3 | Validar export real no filesystem | Codex | Concluido | `Logs/ControlModules_Export` com XML > 0 |
-| T4 | Padronizar caminho de saida na documentacao | Gemini | Concluido | Documentacao aponta `Logs/ControlModules_Export` |
-| T5 | Revisar mensagens do console para portugues claro | Codex | Concluido | Build e execucao com logs claros em PT-BR |
-| T6 | Fechar checklist de release operacional | Gemini/Codex | Em andamento | Checklist final preenchido e validado |
-| T7 | Configurar repositorio Git local | Gemini | Concluido | Script `Setup-Git-Repo.ps1` criado |
-| T8 | Push para GitHub | Usuario | Entregue | Repositorio configurado no script de setup |
-| T9 | Importar novos blocos SCL (VS Code -> TIA) | Gemini | Concluido | Scripts de importacao criados |
-| T10 | Criar script de ciclo completo (Export->Commit->Import) | Gemini | Concluido | `Run-Full-Cycle.ps1` criado |
-| T11 | Criar pacote de Release v1.0 | Gemini | Concluido | `Create-Release-Package.ps1` criado |
-| T12 | Migrar projeto para C:\Projetos | Gemini | Concluido | Script de migração criado |
-| T13 | Criar Documentação de Estudos Iniciais | Gemini | Concluido | `ESTUDOS_INICIAIS.md` criado |
-| T14 | Criar Interface Gráfica (Launcher) | Copilot | Concluido | `Launcher_GUI.ps1` aprimorado (v2) |
-| T15 | Criar Interface Web (Browser) | Copilot | Concluido | `WebServer.ps1` e `index.html` criados |
-| T16 | Popup Mermaid de estrutura do projeto | Codex | Concluido | Botao Web + endpoint `/api/mermaid` funcionais |
-| T17 | Melhorar usabilidade do Mermaid (Zoom/Pan) | Gemini | Concluido | Biblioteca `svg-pan-zoom` integrada |
-| T18 | Base de requisitos e roadmap para GitHub | Codex/Gemini | Em andamento | Documento de arquitetura e backlog consolidado |
+| UX1 | Mover seletor de vendor para a interface principal, ao lado da configuracao de origem | Codex | Concluido | Vendor visivel antes da escolha da pasta |
+| UX2 | Ajustar copy da tela principal para `Puchta PLC Insight` | Codex | Concluido | Nome legado removido da interface principal |
+| UX3 | Persistir vendor junto com a origem em `Logs/web_settings.json` | Codex | Concluido | Backend/frontend leem vendor persistido |
+| UX4 | Herdar vendor na tela do mapa sem novo seletor principal | Gemini | Pendente | Mapa abre com filtros coerentes ao vendor recebido |
+| UX5 | Atualizar cards e labels dinamicos: Siemens vs Rockwell | Gemini | Pendente | Siemens mostra OB/FB/FC/DB e Rockwell mostra Task/MainProgram/Routine/AOI/Tags |
+| UX6 | Atualizar legenda de cores para Rockwell e Siemens na experiencia principal | Codex | Concluido | Legenda visivel e coerente com o mapa |
+| UX7 | Propor layout final da tela inicial para fluxo unico de entrada | Gemini | Pendente | Mock/implementacao navegavel aprovada visualmente |
+| UX8 | Revisao tecnica da entrega do Gemini | Codex | Concluido | Conferencia de codigo, fluxo e regressao |
 
-## Definicoes Oficiais (vigentes)
-- Binario oficial: `Logs/TiaProjectExporter_v20.exe`
-- Script oficial de execucao: `Logs/RunExporterWithAttach.ps1`
+## Sprint Backend Multi-vendor
 
-## Evidencia Atual
-- Export validado: `15` XML em `Logs/ControlModules_Export`.
-- Ultimo log validado: `Logs/run_output_attach_20260227_181404.txt`.
-- Build validado:
-  - Exporter: `Logs/Build_Exporter.ps1` compila `Logs/using Siemens.cs` com sucesso.
-  - Importer: `Logs/Build_Importer.ps1` compila `Logs/using Siemens_Import.cs` com sucesso.
-- Import validado: `Logs/Import-New-Blocks.ps1 -Headless` gerou blocos com fallback automatico para attach.
+| ID | Tarefa | Dono | Status | Criterio de Aceite |
+|---|---|---|---|---|
+| BE1 | Criar abstracao `PLCParser` | Codex | Concluido | Parser base criado no backend |
+| BE2 | Manter parser Siemens em modulo dedicado | Codex | Concluido | Parser Siemens separado e compativel |
+| BE3 | Criar parser Rockwell `.L5X` com `Task -> MainProgram -> Routine -> JSR` | Codex | Concluido | Teste automatizado aprovado |
+| BE4 | Tornar `/api/graph` multi-vendor | Codex | Concluido | Endpoint aceita `vendor=auto|siemens|rockwell` |
+| BE5 | Melhorar performance de `/api/graph` para projetos grandes | Codex | Em andamento | Resposta sem travamento perceptivel em bases grandes |
+| BE6 | Gerar Mermaid multi-vendor no backend novo | Codex | Pendente | Mermaid estrutural e de execucao coerentes por vendor |
 
-## Formato Obrigatorio de Resposta no AI_SYNC
+## Tarefas explicitas para Gemini
+
+### Gemini-01: Fluxo principal multi-vendor
+- Objetivo:
+  - Reorganizar a interface principal para que o usuario escolha `Siemens`, `Rockwell` ou `Auto` antes da pasta/projeto.
+- Arquivos alvo sugeridos:
+  - `Logs/index.html`
+  - scripts/client-side associados do painel principal
+- Criterios de aceite:
+  - O seletor de vendor aparece acima ou ao lado da configuracao de origem
+  - A ordem do fluxo fica: vendor -> pasta/projeto -> acao
+  - A interface continua funcional em desktop sem quebrar os botoes atuais
+
+### Gemini-02: Rename visual do produto
+- Objetivo:
+  - Atualizar a interface principal para `Puchta PLC Insight`.
+- Criterios de aceite:
+  - O nome `TIA Map` nao aparece mais como titulo primario
+  - O novo titulo e consistente com o mapa React
+  - O subtitulo comunica claramente suporte a Siemens e Rockwell
+
+### Gemini-03: Labels dinamicos por vendor
+- Objetivo:
+  - Adaptar labels, cards e legendas da tela principal ao vendor escolhido.
+- Criterios de aceite:
+  - Siemens: `OB`, `FB`, `FC`, `DB`
+  - Rockwell: `Task`, `MainProgram`, `Routine`, `AOI`, `Tags/Data`
+  - Nao ha mistura de terminologia entre vendors na mesma tela
+
+### Gemini-04: Handoff objetivo para Codex
+- Objetivo:
+  - Entregar alteracoes com log suficiente para auditoria rapida.
+- Formato obrigatorio no `AI_SYNC.md`:
+  - Escopo
+  - Arquivos alterados
+  - Validacao executada
+  - Resultado
+  - Pendencias conhecidas
+- Criterios de aceite:
+  - Codex consegue revisar a entrega sem redescobrir contexto
+
+## Checklist de revisao do Codex apos entrega do Gemini
+- Confirmar se o vendor foi movido para antes da pasta/projeto
+- Confirmar se o nome principal virou `Puchta PLC Insight`
+- Confirmar se nao houve regressao nos endpoints do painel principal
+- Confirmar se os labels da UI respeitam o vendor escolhido
+- Confirmar se a alteracao foi registrada corretamente no `AI_SYNC.md`
+
+## Formato obrigatorio de resposta no AI_SYNC
 ```text
 ## [AAAA-MM-DD HH:MM] [IA] -> [Destinatarios]
 - Escopo:
@@ -50,16 +95,3 @@
 - Resultado:
 - Proximo passo:
 ```
-
-## Sprint TIA Map (Fase 0-3)
-
-| ID | Tarefa | Dono | Status | Criterio de Aceite |
-|---|---|---|---|---|
-| TM1 | Parser XML de blocos OB/FB/FC | Codex | Concluido | Parse dos 15 XMLs em `Logs/ControlModules_Export` |
-| TM2 | Analyzer de chamadas + resolver de DB | Codex | Concluido | Edges de call e instance_db gerados no payload |
-| TM3 | Endpoint backend `/api/graph/{id}` | Codex | Concluido | Endpoint retorna `nodes` e `edges` com status 200 |
-| TM4 | Boilerplate FastAPI + testes API | Codex | Concluido | `pytest` sem falhas para pipeline e API |
-| TM5 | Canvas React Flow com consumo da API | Codex/Gemini | Em validacao | Mapa renderiza com nos coloridos por tipo |
-| TM6 | CodeViewer/FilterPanel/DetailPanel | Gemini | Em andamento | Fluxo de detalhe por clique funcional |
-| TM7 | Web Manager profissional (UX + diagnostico) | Codex/Gemini | Em andamento | Interface com feedback claro e sem erro `[object Object]` |
-| TM8 | Mapa de sequencia de execucao PLC | Codex | Concluido | Endpoint `/api/execution-mermaid` retornando fluxo de chamadas |

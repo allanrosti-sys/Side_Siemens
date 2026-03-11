@@ -3,423 +3,1043 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Painel de Operacao TIA</title>
+    <title>Puchta PLC Insight</title>
     <style>
         :root {
-            --bg: #eef2f7;
+            --bg-start: #f4f7fb;
+            --bg-end: #eef2f7;
             --card: #ffffff;
             --text: #1f2937;
-            --muted: #475569;
+            --muted: #4b5563;
             --brand: #0b4f74;
-            --brand-2: #0ea5a8;
-            --danger: #b91c1c;
-            --success: #166534;
-            --shadow: 0 10px 28px rgba(2, 6, 23, 0.09);
+            --brand-light: #0ea5e9;
+            --danger: #c53030;
+            --success: #2f855a;
+            --warning: #b7791f;
+            --border: #d7e1ec;
+            --shadow: 0 14px 34px rgba(15, 23, 42, 0.08);
         }
+
+        * { box-sizing: border-box; }
+
         body {
-            font-family: "Segoe UI", sans-serif;
-            background: linear-gradient(180deg, #f4f7fb 0%, var(--bg) 100%);
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(180deg, var(--bg-start) 0%, var(--bg-end) 100%);
             color: var(--text);
-            max-width: 1120px;
+            max-width: 1100px;
             margin: 0 auto;
-            padding: 28px;
+            padding: 24px;
         }
-        h1 {
+
+        h1, h2, h3 {
             color: var(--brand);
-            border-bottom: 2px solid var(--brand-2);
-            padding-bottom: 8px;
-            margin: 0;
+            margin-top: 0;
         }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
         .subtitle {
             color: var(--muted);
-            margin: 8px 0 18px;
-            font-size: 14px;
+            margin: 6px 0 0;
+            max-width: 720px;
+            line-height: 1.45;
         }
+
         .card {
             background: var(--card);
-            padding: 20px;
-            border-radius: 12px;
+            border: 1px solid var(--border);
+            border-radius: 14px;
             box-shadow: var(--shadow);
-            border: 1px solid #e2e8f0;
-            margin-bottom: 18px;
+            padding: 24px;
+            margin-bottom: 24px;
         }
-        .status {
+
+        .step-label {
+            display: inline-block;
+            font-size: 12px;
             font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--brand-light);
             margin-bottom: 12px;
-            padding: 10px 12px;
-            border-radius: 8px;
-            background: #f8fafc;
-            border: 1px solid #e2e8f0;
         }
-        .actions {
+
+        .intro-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
+            grid-template-columns: 1.05fr 1.45fr;
+            gap: 18px;
         }
-        button {
+
+        .field-label {
             display: block;
-            width: 100%;
-            padding: 14px;
-            border: none;
-            border-radius: 9px;
-            font-size: 14px;
-            cursor: pointer;
-            text-align: left;
-            transition: transform .08s ease, filter .18s ease;
+            font-size: 13px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: var(--text);
         }
-        button:hover { filter: brightness(0.98); transform: translateY(-1px); }
-        .btn-export { background: #e3f2fd; color: #0d47a1; border-left: 5px solid #2196f3; }
-        .btn-import { background: #e8f5e9; color: #1b5e20; border-left: 5px solid #4caf50; }
-        .btn-cycle  { background: #fff3e0; color: #e65100; border-left: 5px solid #ff9800; }
-        .btn-doc    { background: #ede7f6; color: #4527a0; border-left: 5px solid #673ab7; }
-        .btn-map    { background: #e0f2f1; color: #004d40; border-left: 5px solid #009688; }
-        .btn-dev    { background: #e0f2fe; color: #0c4a6e; border-left: 5px solid #0284c7; }
-        #log-container {
-            background: #0b1220;
-            color: #22c55e;
-            padding: 14px;
-            border-radius: 8px;
-            min-height: 220px;
-            white-space: pre-wrap;
-            overflow-y: auto;
-            font-family: Consolas, monospace;
-            border: 1px solid #111827;
+
+        .field-help {
+            color: var(--muted);
+            font-size: 13px;
+            margin-top: 6px;
+            line-height: 1.4;
         }
-        .small-btn { width: auto; padding: 8px 12px; background: #e5e7eb; color: #111827; display: inline-block; }
-        .modal { display: none; position: fixed; z-index: 999; inset: 0; background: rgba(0,0,0,.45); }
-        .modal-content {
+
+        .vendor-panel {
+            background: linear-gradient(135deg, #f8fbff 0%, #eef7fc 100%);
+            border: 1px solid #dbeafe;
+            border-radius: 12px;
+            padding: 18px;
+        }
+
+        .vendor-summary {
+            margin-top: 14px;
             background: #fff;
-            width: min(1240px, 94vw);
-            height: min(84vh, 920px);
-            margin: 4vh auto;
+            border: 1px solid var(--border);
             border-radius: 10px;
             padding: 14px;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            border-radius: 999px;
+            padding: 6px 12px;
+            font-size: 12px;
+            font-weight: 700;
+            background: #e0f2fe;
+            color: var(--brand);
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr auto auto;
+            gap: 10px;
+            align-items: end;
+        }
+
+        select, input {
+            width: 100%;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 11px 12px;
+            font-size: 14px;
+            color: var(--text);
+            background: #fff;
+        }
+
+        button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 14px;
+            border-radius: 10px;
+            border: 1px solid transparent;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+        }
+
+        button:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12);
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.55;
+            box-shadow: none;
+        }
+
+        .btn-primary {
+            background: var(--brand);
+            color: #fff;
+        }
+
+        .btn-secondary {
+            background: #f8fafc;
+            color: #334155;
+            border-color: #cbd5e1;
+        }
+
+        .status-box {
+            margin-top: 14px;
+            border-radius: 10px;
+            padding: 12px 14px;
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            font-size: 13px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+        }
+
+        .status-box.success {
+            background: #f0fff4;
+            border-color: #9ae6b4;
+            color: #22543d;
+        }
+
+        .status-box.error {
+            background: #fff5f5;
+            border-color: #feb2b2;
+            color: #742a2a;
+        }
+
+        .status-box.info {
+            color: var(--muted);
+        }
+
+        .actions-card.disabled {
+            opacity: 0.55;
+            pointer-events: none;
+        }
+
+        .actions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 12px;
+        }
+
+        .action-card {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            min-height: 118px;
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            color: var(--text);
+            text-align: left;
+        }
+
+        .action-card--cta {
+            border: 1px solid #b6d7f2;
+            background: linear-gradient(135deg, #eef7ff 0%, #ffffff 100%);
+        }
+
+        .action-title {
+            font-weight: 700;
+        }
+
+        .action-desc {
+            font-size: 12px;
+            line-height: 1.45;
+            color: var(--muted);
+        }
+
+        .action-note {
+            margin-top: 16px;
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-top: 12px;
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .legend-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .swatch {
+            width: 11px;
+            height: 11px;
+            border-radius: 999px;
+            display: inline-block;
+        }
+
+        .log-container {
+            background: #020617;
+            color: #4ade80;
+            padding: 16px;
+            border-radius: 10px;
+            min-height: 260px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-family: Consolas, Menlo, monospace;
+            font-size: 13px;
+            border: 1px solid #1e293b;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 999;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+        }
+
+        .modal-content {
+            background: #fff;
+            width: min(1240px, 96vw);
+            height: 90vh;
+            margin: 5vh auto;
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .modal-header,
+        .modal-footer {
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+        }
+        
+        .modal-header {
+            justify-content: space-between;
+        }
+
+        .modal-footer {
+            border-bottom: none;
+            border-top: 1px solid var(--border);
+            background: #f8fafc;
+            justify-content: space-between;
+        }
+
+        .modal-body {
+            flex: 1;
+            padding: 16px;
             overflow: auto;
         }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-        .close { border: none; background: #efefef; border-radius: 6px; width: auto; padding: 6px 10px; }
-        #mermaidContainer { min-height: 500px; border: 1px solid #eee; border-radius: 8px; padding: 10px; }
-        .zoom-controls { position: absolute; bottom: 20px; right: 20px; display: flex; gap: 5px; }
-        .zoom-btn {
-            width: 30px; height: 30px; border-radius: 50%; border: 1px solid #ccc;
-            background: white; font-weight: bold; cursor: pointer; display: flex;
-            align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+
+        #mermaidContainer {
+            height: 100%;
         }
-        #tia-map-link-container a {
-            display:block; margin-top:10px; padding:12px; background:#0369a1; color:white;
-            text-align:center; border-radius:8px; text-decoration:none; font-weight:600;
+
+        #mermaidContainer svg {
+            width: 100%;
+            height: 100%;
         }
-        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; }
-        .stat-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px; text-align: center; }
-        .stat-val { display: block; font-size: 18px; font-weight: bold; color: #0f172a; }
-        .stat-label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
-        
-        .health-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px; }
-        .health-item { background: #f1f5f9; padding: 10px; border-radius: 6px; text-align: center; font-size: 12px; border: 1px solid #cbd5e1; }
-        .health-label { display: block; color: #64748b; margin-bottom: 4px; font-weight: 600; }
-        .health-val { font-weight: bold; color: #0f172a; }
-        .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
-        .dot.ok { background-color: #22c55e; } .dot.nok { background-color: #ef4444; }
-        .legend { display: flex; gap: 15px; margin-top: 10px; font-size: 12px; color: #64748b; justify-content: center; }
-        .step-guide { background: #fff7ed; border-left: 4px solid #f97316; padding: 10px; margin: 15px 0; font-size: 13px; color: #9a3412; }
-        .path-box { margin: 10px 0 14px; padding: 10px; border: 1px solid #dbe4ef; border-radius: 8px; background: #f8fafc; }
-        .path-box label { display:block; font-size:12px; font-weight:700; color:#334155; margin-bottom:6px; }
-        .path-row { display:flex; gap:8px; }
-        .path-row input { flex:1; border:1px solid #cbd5e1; border-radius:8px; padding:9px 10px; font-size:13px; }
-        .path-row .small-btn { margin:0; }
-        .path-info { font-size:12px; color:#475569; margin-top:6px; white-space: pre-wrap; }
-        @media (max-width: 860px) {
-            .actions { grid-template-columns: 1fr; }
-            body { padding: 14px; }
+
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 14px 20px;
+            border-radius: 8px;
+            color: #fff;
+            font-weight: 700;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            z-index: 1000;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.3s ease;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .toast.success { background: var(--success); }
+        .toast.error { background: var(--danger); }
+        .toast.info { background: var(--brand); }
+
+        .inline-link {
+            display: inline-block;
+            margin-top: 16px;
+            text-decoration: none;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 820px) {
+            body { padding: 16px; }
+            .intro-grid { grid-template-columns: 1fr; }
+            .form-grid { grid-template-columns: 1fr; }
+            header { flex-direction: column; }
         }
     </style>
 </head>
 <body>
-    <h1>Painel de Operacao TIA</h1>
-    <p class="subtitle">Gestao de ciclo de vida e analise de software PLC (S7-1500).</p>
+    <header>
+        <div>
+            <h1>Puchta PLC Insight</h1>
+            <p class="subtitle">Painel principal para preparar a origem do projeto, escolher o vendor e abrir o mapa de analise de logica Siemens ou Rockwell.</p>
+        </div>
+        <div class="badge" id="active-vendor-badge">Vendor ativo: Auto</div>
+    </header>
 
     <div class="card">
-        <div class="health-grid">
-            <div class="health-item">
-                <span class="health-label">WEBSERVER</span>
-                <span class="health-val" id="server-version"><span class="dot ok"></span>Online (8090)</span>
-            </div>
-            <div class="health-item">
-                <span class="health-label">TIA MAP (API)</span>
-                <span class="health-val">Porta 8011</span>
-            </div>
-            <div class="health-item">
-                <span class="health-label">TIA MAP (UI)</span>
-                <span class="health-val">Porta 5173</span>
-            </div>
-        </div>
-        <div class="status" id="status-text">Sistema pronto.</div>
-        <div class="path-box">
-            <label for="tia-path-input">CONFIGURACAO DE ORIGEM (Pasta do Projeto)</label>
-            <div class="path-row">
-                <input id="tia-path-input" type="text" placeholder="Cole aqui o caminho da pasta onde esta o .ap20 (Ex: C:\Projetos\Tirol)" />
-                <button class="small-btn" onclick="saveTiaPath()" style="background-color: #0f172a; color: white;">Definir Origem</button>
-            </div>
-            <div id="tia-path-info" class="path-info">Aguardando configuracao...</div>
-            
-            <div id="coverage-panel" style="display:none; margin-top:12px; border-top:1px solid #e2e8f0; padding-top:12px;">
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <span class="stat-val" id="stat-total">-</span>
-                        <span class="stat-label">Total XML</span>
-                    </div>
-                    <div class="stat-card">
-                        <span class="stat-val" id="stat-ob" style="color:#7e57c2">-</span>
-                        <span class="stat-label">OBs</span>
-                    </div>
-                    <div class="stat-card">
-                        <span class="stat-val" id="stat-fb" style="color:#1e88e5">-</span>
-                        <span class="stat-label">FBs</span>
-                    </div>
-                    <div class="stat-card">
-                        <span class="stat-val" id="stat-fc" style="color:#2e7d32">-</span>
-                        <span class="stat-label">FCs</span>
-                    </div>
+        <span class="step-label">Passo 1</span>
+        <div class="intro-grid">
+            <div class="vendor-panel">
+                <label class="field-label" for="vendor-select">Escolha a plataforma antes da pasta</label>
+                <select id="vendor-select">
+                    <option value="auto">Auto detectar</option>
+                    <option value="siemens">Siemens</option>
+                    <option value="rockwell">Rockwell</option>
+                </select>
+                <p class="field-help">Essa decisao define a terminologia do painel, a legenda do Mermaid e a estrategia de leitura da origem.</p>
+
+                <div class="vendor-summary">
+                    <strong id="vendor-summary-title">Modo Auto</strong>
+                    <p class="field-help" id="vendor-summary-text">O sistema tenta identificar automaticamente se a origem e Siemens ou Rockwell.</p>
                 </div>
             </div>
+
+            <div>
+                <label class="field-label" for="tia-path-input">Pasta raiz do projeto</label>
+                <div class="form-grid">
+                    <input id="tia-path-input" type="text" placeholder="Ex: C:\\Projetos\\Cliente\\PlantaX ou C:\\Projetos\\Mistura.L5K">
+                    <button class="btn-secondary" type="button" onclick="browseProject()">Procurar</button>
+                    <button class="btn-primary" id="save-path-btn" type="button" onclick="saveProjectSettings()">
+                        <span class="btn-text">Salvar e validar</span>
+                        <span class="spinner" style="display:none; width:16px; height:16px; border:2px solid rgba(255,255,255,0.35); border-top-color:#fff; border-radius:50%; animation: spin 1s linear infinite;"></span>
+                    </button>
+                </div>
+                <p class="field-help">Siemens: selecione a raiz do projeto ou a pasta que contem os XMLs exportados. Rockwell: selecione a raiz com o arquivo `.L5K` ou `.L5X`.</p>
+                <div id="tia-path-info" class="status-box info">Aguardando configuracao.</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card actions-card disabled" id="actions-card">
+        <span class="step-label">Passo 2</span>
+        <h2>Acoes do projeto</h2>
+        <p class="field-help" id="actions-copy">As acoes abaixo herdam o vendor escolhido no passo anterior.</p>
+
+        <div class="actions-grid">
+            <button id="export-button" class="action-card" type="button" onclick="runScript('RunExporterWithAttach.ps1')">
+                <span class="action-title" id="export-title">Exportar XML Siemens</span>
+                <span class="action-desc" id="export-desc">Gera backup XML dos blocos para analise e versionamento.</span>
+            </button>
+
+            <button class="action-card" type="button" onclick="openStructureMap()">
+                <span class="action-title" id="structure-title">Mapa estrutural</span>
+                <span class="action-desc" id="structure-desc">Visualiza a estrutura principal detectada para a origem selecionada.</span>
+            </button>
+
+            <button class="action-card" type="button" onclick="openExecutionMap()">
+                <span class="action-title" id="execution-title">Fluxo de execucao</span>
+                <span class="action-desc" id="execution-desc">Mostra chamadas entre blocos, rotinas ou subrotinas.</span>
+            </button>
+
+            <button class="action-card" type="button" onclick="runScript('Run-TiaMap-Dev.ps1')">
+                <span class="action-title">Abrir Puchta PLC Insight</span>
+                <span class="action-desc">Inicializa o app React/FastAPI para analise visual aprofundada.</span>
+            </button>
+
+            <button class="action-card" type="button" onclick="requestImportPath()">
+                <span class="action-title" id="import-title">Importar blocos</span>
+                <span class="action-desc" id="import-desc">Fluxo auxiliar para importar arquivos suportados para o projeto.</span>
+            </button>
+
+            <button id="doc-button" class="action-card" type="button" onclick="runScript('Generate-Documentation.ps1')">
+                <span class="action-title" id="doc-title">Documentacao HTML</span>
+                <span class="action-desc" id="doc-desc">Gera um relatorio tecnico navegavel da origem analisada.</span>
+            </button>
         </div>
 
-        <div class="step-guide">
-            <strong>FLUXO DE OPERACAO:</strong> 1. Defina a pasta de origem acima &rarr; 2. Execute "Exportar" (Botao 1) &rarr; 3. Visualize os mapas (Botoes 5, 6 ou 7).
-        </div>
-
-        <div class="actions">
-            <button class="btn-export" onclick="runScript('RunExporterWithAttach.ps1')">1. Exportar (Backup XML)</button>
-            <button class="btn-import" onclick="requestImportPath()">2. Importar (SCL/UDT)</button>
-            <button class="btn-cycle" onclick="runScript('Run-Full-Cycle.ps1')">3. Ciclo DevOps (Full)</button>
-            <button class="btn-doc" onclick="runScript('Generate-Documentation.ps1')">4. Documentacao (HTML)</button>
-            <button class="btn-map" onclick="openStructureMap()">5. Mapa Estrutural</button>
-            <button class="btn-map" onclick="openExecutionMap()">6. Fluxo de Execucao</button>
-            <button class="btn-dev" onclick="runScript('Run-TiaMap-Dev.ps1')">7. TIA Map (App)</button>
-        </div>
+        <div class="action-note" id="vendor-note">Siemens suporta exportacao direta via TIA. Rockwell parte de um .L5X previamente exportado pelo Studio 5000.</div>
         <div id="tia-map-link-container"></div>
     </div>
 
     <div class="card">
-        <h3>Monitor de logs (ultima execucao)</h3>
-        <div id="log-container">Aguardando logs...</div>
-        <button class="small-btn" onclick="fetchLogs()">Atualizar logs</button>
+        <span class="step-label">Legenda</span>
+        <h2>Semantica do mapa</h2>
+        <p class="field-help" id="legend-copy">A legenda muda conforme o vendor ativo para evitar mistura de terminologia.</p>
+        <div class="legend" id="legend-container"></div>
+    </div>
+
+    <div class="card">
+        <span class="step-label">Monitor</span>
+        <h2>Logs de execucao</h2>
+        <div class="log-container" id="log-container">Aguardando logs...</div>
     </div>
 
     <div id="structureModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3 id="modalTitle">Mapa Mermaid</h3>
-                <button class="close" onclick="closeStructureMap()">Fechar</button>
+                <h2 id="modalTitle">Visualizador de diagramas</h2>
+                <button class="btn-secondary" type="button" onclick="closeStructureMap()">Fechar</button>
             </div>
-            <div style="position: relative; height: 100%; overflow: hidden;">
-                <div id="mermaidContainer" style="height: 100%; border: none;">Carregando diagrama...</div>
-                <div class="zoom-controls">
-                    <button class="zoom-btn" onclick="zoomIn()">+</button>
-                    <button class="zoom-btn" onclick="zoomOut()">-</button>
-                    <button class="zoom-btn" onclick="resetZoom()">R</button>
-                </div>
-                <div class="legend">
-                    <span><span style="color:#7e57c2">●</span> OB (Roxo)</span>
-                    <span><span style="color:#1e88e5">●</span> FB (Azul)</span>
-                    <span><span style="color:#2e7d32">●</span> FC (Verde)</span>
-                    <span><span style="color:#9e9e9e">●</span> DB (Cinza)</span>
+            <div class="modal-body">
+                <div id="mermaidContainer">Carregando diagrama...</div>
+            </div>
+            <div class="modal-footer">
+                <div class="legend" id="modal-legend-container"></div>
+                 <div style="margin-left: auto; display: flex; gap: 10px;">
+                    <button id="zoom-out-btn" class="btn-secondary" type="button" title="Diminuir Zoom">➖</button>
+                    <button id="zoom-in-btn" class="btn-secondary" type="button" title="Aumentar Zoom">➕</button>
+                    <button id="zoom-reset-btn" class="btn-secondary" type="button">Redefinir</button>
                 </div>
             </div>
         </div>
     </div>
 
+    <div id="toast-container"></div>
+
     <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom/dist/svg-pan-zoom.min.js"></script>
     <script>
-        if (window.mermaid) {
-            mermaid.initialize({ startOnLoad: false, securityLevel: 'loose' });
+        mermaid.initialize({ startOnLoad: false, securityLevel: "loose", maxTextSize: 5000000, maxEdges: 5000 });
+
+        const VENDOR_META = {
+            auto: {
+                badge: "Auto",
+                summaryTitle: "Modo Auto",
+                summaryText: "O sistema tenta identificar automaticamente se a origem e Siemens ou Rockwell.",
+                actionsCopy: "As acoes abaixo herdam o vendor escolhido no passo anterior.",
+                exportTitle: "Exportar XML Siemens",
+                exportDesc: "Disponivel quando a origem efetiva for Siemens.",
+                structureTitle: "Mapa estrutural",
+                structureDesc: "Visualiza a estrutura principal detectada para a origem selecionada.",
+                executionTitle: "Fluxo de execucao",
+                executionDesc: "Mostra chamadas entre blocos, rotinas ou subrotinas.",
+                importTitle: "Importar blocos",
+                importDesc: "Fluxo auxiliar para importar arquivos suportados para o projeto.",
+                vendorNote: "Siemens suporta exportacao direta via TIA. Rockwell parte de um .L5X previamente exportado pelo Studio 5000.",
+                legend: [
+                    { color: "#7e57c2", text: "OB" },
+                    { color: "#1e88e5", text: "FB" },
+                    { color: "#2e7d32", text: "FC" },
+                    { color: "#757575", text: "DB / Dados" },
+                    { color: "#c62828", text: "MainProgram" },
+                    { color: "#2e7d32", text: "Routine" },
+                    { color: "#1e88e5", text: "AOI" }
+                ]
+            },
+            siemens: {
+                badge: "Siemens",
+                summaryTitle: "Modo Siemens",
+                summaryText: "Fluxo otimizado para TIA Portal, XMLs exportados, OB/FB/FC/DB e documentacao tecnica do projeto.",
+                actionsCopy: "Os textos e o mapa agora usam a semantica Siemens.",
+                exportTitle: "Exportar XML Siemens",
+                exportDesc: "Executa o exportador TIA e prepara a base XML usada nas analises.",
+                structureTitle: "Mapa estrutural Siemens",
+                structureDesc: "Agrupa blocos e pastas exportadas do projeto TIA.",
+                executionTitle: "Fluxo OB / FB / FC",
+                executionDesc: "Mostra o call graph entre blocos Siemens exportados.",
+                importTitle: "Importar SCL / UDT",
+                importDesc: "Importa artefatos Siemens suportados para o projeto.",
+                vendorNote: "Use a raiz do projeto TIA ou uma pasta de exportacao XML ja existente.",
+                legend: [
+                    { color: "#7e57c2", text: "OB" },
+                    { color: "#1e88e5", text: "FB" },
+                    { color: "#2e7d32", text: "FC" },
+                    { color: "#757575", text: "DB / Dados" }
+                ]
+            },
+            rockwell: {
+                badge: "Rockwell",
+                summaryTitle: "Modo Rockwell",
+                summaryText: "Fluxo voltado para L5K/L5X, hierarquia Task -> MainProgram -> Routine e chamadas JSR.",
+                actionsCopy: "Os textos e a legenda agora usam a semantica Rockwell.",
+                exportTitle: "Origem L5X pronta",
+                exportDesc: "Rockwell nao usa exportador TIA neste painel. A analise parte de um arquivo .L5X ja exportado.",
+                structureTitle: "Mapa Task / Program / Routine",
+                structureDesc: "Visualiza a hierarquia principal detectada no arquivo L5X.",
+                executionTitle: "Fluxo JSR",
+                executionDesc: "Mostra chamadas entre rotinas e subrotinas Rockwell.",
+                importTitle: "Importar referencia",
+                importDesc: "Fluxo auxiliar para apontar arquivos de apoio para a analise.",
+                vendorNote: "Selecione a pasta que contem o arquivo .L5K/.L5X exportado pelo Studio 5000.",
+                legend: [
+                    { color: "#c62828", text: "MainProgram" },
+                    { color: "#2e7d32", text: "Routine" },
+                    { color: "#1e88e5", text: "AOI" },
+                    { color: "#757575", text: "Tags / Data" }
+                ]
+            }
+        };
+
+        let isActionRunning = false;
+        let activeLogPath = "";
+        let activeLogPoller = null;
+        let activePathPoller = null;
+        let selectedVendor = "auto";
+        let detectedVendor = "auto";
+        let panZoomInstance = null;
+
+        const DOMElements = {
+            actionsCard: document.getElementById("actions-card"),
+            pathInput: document.getElementById("tia-path-input"),
+            pathInfo: document.getElementById("tia-path-info"),
+            logContainer: document.getElementById("log-container"),
+            mapLink: document.getElementById("tia-map-link-container"),
+            modal: document.getElementById("structureModal"),
+            modalTitle: document.getElementById("modalTitle"),
+            mermaidContainer: document.getElementById("mermaidContainer"),
+            savePathBtn: document.getElementById("save-path-btn"),
+            vendorSelect: document.getElementById("vendor-select"),
+            vendorBadge: document.getElementById("active-vendor-badge"),
+            vendorSummaryTitle: document.getElementById("vendor-summary-title"),
+            vendorSummaryText: document.getElementById("vendor-summary-text"),
+            legendContainer: document.getElementById("legend-container"),
+            modalLegendContainer: document.getElementById("modal-legend-container"),
+            actionsCopy: document.getElementById("actions-copy"),
+            exportButton: document.getElementById("export-button"),
+            exportTitle: document.getElementById("export-title"),
+            exportDesc: document.getElementById("export-desc"),
+            structureTitle: document.getElementById("structure-title"),
+            structureDesc: document.getElementById("structure-desc"),
+            executionTitle: document.getElementById("execution-title"),
+            executionDesc: document.getElementById("execution-desc"),
+            importTitle: document.getElementById("import-title"),
+            importDesc: document.getElementById("import-desc"),
+            vendorNote: document.getElementById("vendor-note"),
+            docButton: document.getElementById("doc-button"),
+            docTitle: document.getElementById("doc-title"),
+            docDesc: document.getElementById("doc-desc"),
+            zoomInBtn: document.getElementById("zoom-in-btn"),
+            zoomOutBtn: document.getElementById("zoom-out-btn"),
+            zoomResetBtn: document.getElementById("zoom-reset-btn"),
+        };
+
+        function getEffectiveVendor() {
+            return selectedVendor === "auto" ? (detectedVendor || "auto") : selectedVendor;
+        }
+
+        function renderLegend(target, vendorKey) {
+            const meta = VENDOR_META[vendorKey] || VENDOR_META.auto;
+            target.innerHTML = meta.legend.map(item => `
+                <span class="legend-item">
+                    <span class="swatch" style="background:${item.color}"></span>
+                    <span>${item.text}</span>
+                </span>
+            `).join("");
+        }
+
+        function applyVendorUI() {
+            const uiVendor = getEffectiveVendor();
+            const meta = VENDOR_META[uiVendor] || VENDOR_META.auto;
+
+            DOMElements.vendorBadge.textContent = `Vendor ativo: ${meta.badge}`;
+            DOMElements.vendorSummaryTitle.textContent = meta.summaryTitle;
+            DOMElements.vendorSummaryText.textContent = meta.summaryText;
+            DOMElements.actionsCopy.textContent = meta.actionsCopy;
+            DOMElements.exportTitle.textContent = meta.exportTitle;
+            DOMElements.exportDesc.textContent = meta.exportDesc;
+            DOMElements.structureTitle.textContent = meta.structureTitle;
+            DOMElements.structureDesc.textContent = meta.structureDesc;
+            DOMElements.executionTitle.textContent = meta.executionTitle;
+            DOMElements.executionDesc.textContent = meta.executionDesc;
+            DOMElements.importTitle.textContent = meta.importTitle;
+            DOMElements.importDesc.textContent = meta.importDesc;
+            DOMElements.vendorNote.textContent = meta.vendorNote;
+
+            const exportDisabled = uiVendor === "rockwell";
+            DOMElements.exportButton.disabled = exportDisabled || isActionRunning;
+            DOMElements.exportButton.title = exportDisabled
+                ? "Rockwell usa arquivo .L5X previamente exportado."
+                : "Gera backup XML dos blocos Siemens.";
+
+            DOMElements.docButton.disabled = isActionRunning;
+            if (uiVendor === "rockwell") {
+                DOMElements.docButton.title = "Gera HTML com resumo de Tasks/Programs/Rotinas Rockwell.";
+                DOMElements.docTitle.textContent = "Documentacao Rockwell";
+                DOMElements.docDesc.textContent = "Gera relatorio HTML da origem L5K/L5X.";
+            } else {
+                DOMElements.docButton.title = "Gera HTML do projeto Siemens.";
+                DOMElements.docTitle.textContent = "Documentacao HTML";
+                DOMElements.docDesc.textContent = "Gera um relatorio tecnico navegavel da origem analisada.";
+            }
+
+            renderLegend(DOMElements.legendContainer, uiVendor);
+            renderLegend(DOMElements.modalLegendContainer, uiVendor);
+        }
+
+        function showToast(message, type = "info", duration = 4000) {
+            const container = document.getElementById("toast-container");
+            const toast = document.createElement("div");
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+
+            setTimeout(() => toast.classList.add("show"), 10);
+            setTimeout(() => {
+                toast.classList.remove("show");
+                toast.addEventListener("transitionend", () => toast.remove());
+            }, duration);
+        }
+
+        function setActionRunning(running) {
+            isActionRunning = running;
+            document.querySelectorAll(".action-card, .btn-primary, .btn-secondary").forEach(btn => {
+                if (btn.id === "export-button") {
+                    return;
+                }
+                btn.disabled = running;
+            });
+            DOMElements.vendorSelect.disabled = running;
+            applyVendorUI();
+        }
+
+        function setSaveButtonLoading(loading) {
+            const btnText = DOMElements.savePathBtn.querySelector(".btn-text");
+            const spinner = DOMElements.savePathBtn.querySelector(".spinner");
+            btnText.style.display = loading ? "none" : "inline";
+            spinner.style.display = loading ? "inline-block" : "none";
+            DOMElements.savePathBtn.disabled = loading;
+        }
+
+        function updatePathInfo(text, type = "info") {
+            DOMElements.pathInfo.textContent = text;
+            DOMElements.pathInfo.className = `status-box ${type}`;
         }
 
         async function parseJsonSafe(response) {
             const raw = await response.text();
             try {
                 return JSON.parse(raw);
-            } catch (e) {
+            } catch (error) {
                 throw new Error(`Resposta invalida do servidor (${response.status}): ${raw.slice(0, 240)}`);
             }
         }
 
-        function setStatus(message, type = 'info') {
-            const status = document.getElementById('status-text');
-            status.innerText = message;
-            if (type === 'error') status.style.color = '#b91c1c';
-            else if (type === 'success') status.style.color = '#166534';
-            else status.style.color = '#0b4f74';
+        // Limpa a area de log e prepara a nova execucao.
+        function resetLogView(message) {
+            DOMElements.logContainer.textContent = message || "Aguardando logs da nova acao...";
         }
 
-        async function requestImportPath() {
-            // Pop-up solicitando a origem dos blocos
-            const defaultPath = "C:\\Users\\Administrador\\Documents\\tirol-ipiranga-os18869_20260224_PE_V20\\Logs\\NewBlocks";
-            const path = prompt("Informe o caminho da pasta contendo os arquivos .scl e .udt para importacao:", defaultPath);
-            
-            if (path !== null) { // Se usuario nao cancelou
-                if (path.trim() === "") {
-                    setStatus("Importacao cancelada: caminho vazio.", "error");
-                } else {
-                    runScript('Import-New-Blocks.ps1', { sourcePath: path });
+        // Cancela polling anterior para evitar mistura de logs.
+        function stopLogPolling() {
+            if (activeLogPoller) {
+                clearInterval(activeLogPoller);
+                activeLogPoller = null;
+            }
+        }
+
+        // Cancela polling de selecao de pasta para evitar loops.
+        function stopPathPolling() {
+            if (activePathPoller) {
+                clearInterval(activePathPoller);
+                activePathPoller = null;
+            }
+        }
+
+        async function fetchLogs(logPath) {
+            const effectivePath = logPath || activeLogPath;
+            try {
+                const url = effectivePath
+                    ? `/api/logs?logPath=${encodeURIComponent(effectivePath)}`
+                    : "/api/logs";
+                const response = await fetch(url);
+                if (!response.ok) { 
+                    // Nao mostra um erro se o arquivo de log ainda nao foi criado.
+                    if (response.status === 404) {
+                        DOMElements.logContainer.textContent = "Aguardando saida do script...";
+                        return;
+                    }
+                    throw new Error(`Servidor retornou ${response.status}`);
                 }
+                const data = await parseJsonSafe(response);
+                let logText = data.log;
+                if (typeof logText === 'object' && logText !== null) {
+                    logText = JSON.stringify(logText, null, 2);
+                }
+                if (logText) {
+                    DOMElements.logContainer.textContent = logText;
+                }
+            } catch (error) {
+                DOMElements.logContainer.textContent = `Erro ao buscar logs: ${error.message}`;
             }
         }
 
         async function runScript(scriptName, extraData = {}) {
-            setStatus(`Status: solicitando execucao de ${scriptName}...`, 'info');
+            if (isActionRunning) {
+                showToast("Aguarde a operacao atual finalizar.", "info");
+                return;
+            }
+
+            const isNonBlocking = scriptName === "Run-TiaMap-Dev.ps1";
+            if (!isNonBlocking) {
+                setActionRunning(true);
+            }
+            resetLogView(`Iniciando execucao de ${scriptName}...`);
+            DOMElements.mapLink.innerHTML = ''; 
+            stopLogPolling();
+            activeLogPath = "";
+
             try {
-                const response = await fetch('/api/run', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ script: scriptName, ...extraData })
+                const response = await fetch("/api/run", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ script: scriptName, vendor: selectedVendor, ...extraData })
                 });
 
                 const result = await parseJsonSafe(response);
-                if (result.status === 'success') {
-                    setStatus(`Status: ${scriptName} iniciado com sucesso.`, 'success');
-                    if (scriptName === 'Run-TiaMap-Dev.ps1') {
-                        const linkDiv = document.getElementById('tia-map-link-container');
-                        linkDiv.innerHTML = '<a href="http://localhost:5173" target="_blank">Abrir TIA Map (http://localhost:5173)</a>';
-                    }
-                    
-                    // Se o backend retornou uma URL de documentacao (ex: Generate-Documentation.ps1)
-                    if (result.docUrl) {
-                        window.open(result.docUrl, '_blank');
-                        setStatus(`Documentacao gerada e aberta em nova aba.`, 'success');
-                    }
-                    setTimeout(fetchLogs, 1200);
+                if (result.status !== "success") {
+                    throw new Error(result.message || "Falha ao iniciar script.");
+                }
+
+                showToast(`${scriptName} iniciado com sucesso.`, "success");
+
+                // Inicia o polling do log especifico, se o caminho for retornado.
+                if (result.logPath) {
+                    activeLogPath = result.logPath;
+                    let pollCount = 0;
+                    const maxPolls = 15; // 15 * 2s = 30 segundos
+                    activeLogPoller = setInterval(() => {
+                        fetchLogs(result.logPath);
+                        pollCount++;
+                        if (pollCount >= maxPolls) {
+                            stopLogPolling();
+                            setTimeout(() => fetchLogs(result.logPath), 500); // Busca final
+                        }
+                    }, 2000);
+                }
+
+                if (scriptName === "Run-TiaMap-Dev.ps1") {
+                    DOMElements.mapLink.innerHTML = `
+                        <button class="action-card action-card--cta" type="button" onclick="window.open('http://localhost:5173', '_blank')">
+                            <span class="action-title">Abrir Puchta PLC Insight</span>
+                            <span class="action-desc">Abrir o painel visual em uma nova aba.</span>
+                        </button>
+                    `;
+                }
+                if (result.docUrl) {
+                    window.open(result.docUrl, "_blank");
+                }
+                
+            } catch (error) {
+                showToast(`Erro de execucao: ${error.message}`, "error", 6000);
+                resetLogView(`Erro: ${error.message}`);
+                stopLogPolling();
+            } finally {
+                // Mantem a acao visualmente 'rodando' enquanto o polling acontece.
+                if (!isNonBlocking) {
+                    setTimeout(() => {
+                        setActionRunning(false);
+                        stopLogPolling();
+                    }, 30000); // Corresponde a duracao do polling
                 } else {
-                    let errorMsg = `Erro: ${result.message || 'Falha nao informada.'}`;
-                    if (result.script) errorMsg += `\nScript: ${result.script}`;
-                    if (result.searched) errorMsg += `\nLocais pesquisados: ${result.searched}`;
-                    setStatus(errorMsg, 'error');
+                    setActionRunning(false);
                 }
-            } catch (error) {
-                setStatus(`Erro de conexao: ${error}`, 'error');
             }
         }
 
-        async function loadServerVersion() {
+        async function loadProjectSettings() {
             try {
-                const response = await fetch('/api/version');
-                if (response.ok) {
-                    const data = await parseJsonSafe(response);
-                    if (data.version) {
-                        document.getElementById('server-version').innerHTML = `<span class="dot ok"></span>v${data.version} (${data.port || 8090})`;
-                    }
+                const response = await fetch("/api/project-path");
+                if (!response.ok) {
+                    throw new Error(`API indisponivel (${response.status})`);
                 }
-            } catch (e) { console.log('Versao nao disponivel'); }
-        }
 
-        async function loadTiaPath() {
-            try {
-                const response = await fetch('/api/project-path');
-                if (response.status === 404) {
-                    throw new Error("Rota /api/project-path nao encontrada. Abra o painel pela URL correta (http://localhost:8090).");
-                }
                 const data = await parseJsonSafe(response);
-                const input = document.getElementById('tia-path-input');
-                const info = document.getElementById('tia-path-info');
-                input.value = data.tiaPath || '';
-                info.innerText = `Origem XML detectada: ${data.resolvedExportPath || 'Nao encontrada'} | Arquivos indexados: ${data.xmlCount ?? 0}`;
-                loadCoverage();
+                selectedVendor = data.vendor || "auto";
+                detectedVendor = data.detectedVendor || "auto";
+                DOMElements.vendorSelect.value = selectedVendor;
+                DOMElements.pathInput.value = data.tiaPath || "";
+
+                if (data.tiaPath) {
+                    if (data.detectedVendor === "rockwell") {
+                        const statusMsg = data.rockwellSource
+                            ? `Arquivo Rockwell: ${data.rockwellSource}`
+                            : (data.rockwellStatus || "Arquivo Rockwell nao localizado ainda.");
+                        const statusType = data.rockwellSource ? "success" : "error";
+                        updatePathInfo(`Origem configurada: ${data.tiaPath}\nVendor Efetivo: ${data.detectedVendor}\n${statusMsg}`, statusType);
+                        if (data.rockwellSource) {
+                            DOMElements.actionsCard.classList.remove("disabled");
+                        } else {
+                            DOMElements.actionsCard.classList.add("disabled");
+                        }
+                    } else {
+                        updatePathInfo(`Origem configurada: ${data.tiaPath}\nVendor Efetivo: ${data.detectedVendor} | XMLs: ${data.xmlCount}`, "success");
+                        DOMElements.actionsCard.classList.remove("disabled");
+                    }
+                } else {
+                    updatePathInfo("Aguardando configuracao. Escolha vendor e pasta antes das acoes.", "info");
+                    DOMElements.actionsCard.classList.add("disabled");
+                }
+
+                applyVendorUI();
             } catch (error) {
-                document.getElementById('tia-path-info').innerText = `Falha ao carregar caminho: ${error}`;
+                updatePathInfo(`Falha ao carregar configuracao: ${error.message}`, "error");
+                showToast("Servidor pode estar desatualizado. Reinicie o WebServer se necessario.", "error");
             }
         }
 
-        async function saveTiaPath() {
-            const input = document.getElementById('tia-path-input');
-            const pathValue = (input.value || '').trim();
+        async function saveProjectSettings() {
+            const pathValue = (DOMElements.pathInput.value || "").trim();
             if (!pathValue) {
-                setStatus('Informe um caminho de pasta TIA antes de salvar.', 'error');
+                showToast("Informe um caminho antes de salvar.", "error");
                 return;
             }
+
+            selectedVendor = DOMElements.vendorSelect.value || "auto";
+            setSaveButtonLoading(true);
+            resetLogView("Salvando configuracao da origem...");
+            stopLogPolling();
+            stopPathPolling();
+            activeLogPath = "";
+
             try {
-                const response = await fetch('/api/project-path', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ path: pathValue })
+                // Tenta salvar com uma nova tentativa em caso de erro de conexao.
+                const doRequest = async () => fetch("/api/project-path", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ path: pathValue, vendor: selectedVendor })
                 });
-                if (response.status === 404) {
-                    throw new Error("Rota /api/project-path nao encontrada. Abra o painel pela URL correta (http://localhost:8090).");
+                let response = await doRequest();
+                if (!response.ok) {
+                    // Retry simples para erros de rede intermitentes.
+                    await new Promise(resolve => setTimeout(resolve, 800));
+                    response = await doRequest();
                 }
+
+                if (!response.ok) {
+                    throw new Error(`Servidor retornou ${response.status}`);
+                }
+
                 const data = await parseJsonSafe(response);
-                if (data.status === 'success') {
-                    setStatus('Origem definida com sucesso.', 'success');
-                    document.getElementById('tia-path-info').innerText = `Origem XML detectada: ${data.resolvedExportPath || 'Nao encontrada'} | Arquivos indexados: ${data.xmlCount ?? 0}`;
-                    loadCoverage();
-                } else {
-                    setStatus(`Erro ao salvar caminho: ${data.message || 'falha desconhecida'}`, 'error');
+                if (data.status !== "success") {
+                    throw new Error(data.message || "Falha ao salvar.");
                 }
+
+                detectedVendor = data.detectedVendor || selectedVendor;
+                showToast("Configuracao salva com sucesso.", "success");
+                await loadProjectSettings();
             } catch (error) {
-                setStatus(`Erro de conexao ao salvar caminho: ${error}`, 'error');
+                updatePathInfo(`Erro ao salvar: ${error.message}`, "error");
+                showToast(error.message, "error", 6000);
+            } finally {
+                setSaveButtonLoading(false);
             }
         }
+        
+        async function browseProject() {
+            if (isActionRunning) return;
 
-        async function loadCoverage() {
-            try {
-                const response = await fetch('/api/coverage');
-                if (response.ok) {
-                    const data = await parseJsonSafe(response);
-                    document.getElementById('coverage-panel').style.display = 'block';
-                    document.getElementById('stat-total').innerText = data.total;
-                    document.getElementById('stat-ob').innerText = data.types.OB;
-                    document.getElementById('stat-fb').innerText = data.types.FB;
-                    document.getElementById('stat-fc').innerText = data.types.FC;
-                }
-            } catch (e) {
-                console.log('Erro ao carregar cobertura:', e);
-            }
-        }
+            const originalPath = DOMElements.pathInput.value;
+            setActionRunning(true);
+            updatePathInfo("Aguardando sua selecao na janela de dialogo que abriu...", "info");
+            resetLogView("Aguardando selecao da pasta do projeto...");
+            stopLogPolling();
+            stopPathPolling();
+            activeLogPath = "";
 
-        async function fetchLogs() {
             try {
-                const response = await fetch('/api/logs');
+                const response = await fetch("/api/browse-project");
                 const data = await parseJsonSafe(response);
-                let logText = data.log;
-                if (typeof logText === 'object' && logText !== null) {
-                    logText = logText.value || JSON.stringify(logText, null, 2);
+
+                if (data.status !== "pending") {
+                    throw new Error(data.message || "Nao foi possivel iniciar o seletor.");
                 }
-                document.getElementById('log-container').innerText = logText || 'Nenhum log disponivel.';
+                
+                let pollCount = 0;
+                let unchangedCount = 0;
+                const maxPolls = 30; // 30 * 1.5s = 45s
+                const maxUnchanged = 4; // 6s sem mudanca -> assume cancelamento
+                activePathPoller = setInterval(async () => {
+                    try {
+                        const pathResponse = await fetch("/api/project-path");
+                        const pathData = await parseJsonSafe(pathResponse);
+                        if (pathData.tiaPath && pathData.tiaPath !== originalPath) {
+                            stopPathPolling();
+                            showToast("Pasta selecionada! Clique em 'Salvar e validar'.", "success");
+                            DOMElements.pathInput.value = pathData.tiaPath;
+                            updatePathInfo("Novo caminho selecionado. Clique em 'Salvar e validar' para confirmar.", "info");
+                            setActionRunning(false);
+                            return;
+                        }
+                        unchangedCount++;
+                    } catch (e) {
+                        // Ignora erros de polling, continua tentando
+                    }
+                    pollCount++;
+                    if (unchangedCount >= maxUnchanged || pollCount >= maxPolls) {
+                        stopPathPolling();
+                        showToast("Selecao de pasta cancelada ou expirou.", "info");
+                        loadProjectSettings();
+                        setActionRunning(false);
+                    }
+                }, 1500);
+
             } catch (error) {
-                document.getElementById('log-container').innerText = `Erro ao buscar logs: ${error}`;
+                showToast(`Falha ao abrir seletor: ${error.message}`, "error");
+                updatePathInfo(`Erro: ${error.message}`, "error");
+                stopPathPolling();
+                setActionRunning(false);
             }
         }
 
-        let panZoomInstance = null;
+        function requestImportPath() {
+            const uiVendor = getEffectiveVendor();
+            if (uiVendor === "rockwell") {
+                resetLogView("Importacao indisponivel para Rockwell neste painel.");
+                showToast("Importacao Rockwell nao disponivel aqui. Use o Puchta PLC Insight.", "info", 5000);
+                return;
+            }
 
-        async function renderMermaidFromEndpoint(endpoint, titleText, fallback) {
-            const modal = document.getElementById('structureModal');
-            const container = document.getElementById('mermaidContainer');
-            const title = document.getElementById('modalTitle');
-            title.innerText = titleText;
-            modal.style.display = 'block';
-            container.innerText = 'Carregando diagrama...';
+            resetLogView("Aguardando selecao da pasta de importacao...");
+            stopLogPolling();
+            activeLogPath = "";
+
+            fetch("/api/browse-import")
+                .then(parseJsonSafe)
+                .then(data => {
+                    if (data.status !== "pending") {
+                        throw new Error(data.message || "Nao foi possivel abrir o seletor.");
+                    }
+
+                    const poll = setInterval(async () => {
+                        try {
+                            const resp = await fetch("/api/get-import-path");
+                            const pathData = await parseJsonSafe(resp);
+                            if (pathData.status === "success" && pathData.path) {
+                                clearInterval(poll);
+                                showToast("Pasta de importacao selecionada. Iniciando importacao...", "success");
+                                runScript("Import-New-Blocks.ps1", { sourcePath: pathData.path });
+                            }
+                        } catch (err) {
+                            // Ignora erros temporarios durante o polling
+                        }
+                    }, 1500);
+
+                    setTimeout(() => {
+                        clearInterval(poll);
+                        if (!isActionRunning) {
+                            resetLogView("Selecao de importacao cancelada ou expirou.");
+                            showToast("Selecao de pasta expirou.", "info");
+                        }
+                    }, 45000);
+                })
+                .catch(error => {
+                    showToast(`Falha ao abrir seletor: ${error.message}`, "error");
+                    resetLogView(`Erro ao iniciar importacao: ${error.message}`);
+                });
+        }
+
+        async function renderMermaidFromEndpoint(endpoint, title) {
+            DOMElements.modal.style.display = "block";
+            DOMElements.modalTitle.textContent = title;
+            DOMElements.mermaidContainer.innerHTML = "<h4>Carregando diagrama...</h4>";
 
             try {
                 const response = await fetch(endpoint);
                 const data = await parseJsonSafe(response);
-                const definition = data.diagram || fallback;
-
-                if (!window.mermaid) {
-                    container.innerText = definition;
-                    return;
-                }
-
-                const id = 'm' + Date.now();
-                const render = await mermaid.render(id, definition);
-                container.innerHTML = render.svg;
-
-                const svgElement = container.querySelector('svg');
+                const definition = data.diagram || 'graph TD\n  A["Diagrama nao pode ser gerado"];';
+                const { svg } = await mermaid.render(`mermaid-${Date.now()}`, definition);
+                DOMElements.mermaidContainer.innerHTML = svg;
+                
+                const svgElement = DOMElements.mermaidContainer.querySelector('svg');
                 if (svgElement) {
-                    svgElement.style.height = '100%';
-                    svgElement.style.width = '100%';
                     panZoomInstance = svgPanZoom(svgElement, {
                         zoomEnabled: true,
-                        controlIconsEnabled: false,
+                        controlIconsEnabled: false, // Desabilita icones padrao
                         fit: true,
                         center: true,
                         minZoom: 0.01,
@@ -427,40 +1047,51 @@
                     });
                 }
             } catch (error) {
-                container.innerText = `Erro ao gerar diagrama: ${error}`;
+                DOMElements.mermaidContainer.innerHTML = `<h4 style="color:#c53030">Erro ao gerar diagrama</h4><pre>${error.message}</pre>`;
             }
         }
 
-        async function openStructureMap() {
-            return renderMermaidFromEndpoint('/api/mermaid', 'Mapa de Estrutura de Pastas', 'graph TD\nA[Sem dados de estrutura]');
+        function openStructureMap() {
+            resetLogView("Gerando mapa estrutural...");
+            renderMermaidFromEndpoint("/api/mermaid", "Mapa estrutural");
         }
 
-        async function openExecutionMap() {
-            return renderMermaidFromEndpoint('/api/execution-mermaid', 'Mapa de Sequencia de Execucao PLC', 'graph TD\nA[Sem dados de execucao]');
+        function openExecutionMap() {
+            resetLogView("Gerando fluxo de execucao...");
+            renderMermaidFromEndpoint("/api/execution-mermaid", "Fluxo de execucao");
         }
-
-        function zoomIn() { if (panZoomInstance) panZoomInstance.zoomIn(); }
-        function zoomOut() { if (panZoomInstance) panZoomInstance.zoomOut(); }
-        function resetZoom() { if (panZoomInstance) panZoomInstance.resetZoom(); }
 
         function closeStructureMap() {
-            document.getElementById('structureModal').style.display = 'none';
             if (panZoomInstance) {
                 panZoomInstance.destroy();
                 panZoomInstance = null;
             }
+            DOMElements.modal.style.display = "none";
+            DOMElements.mermaidContainer.innerHTML = "";
         }
 
-        window.onclick = function(event) {
-            const modal = document.getElementById('structureModal');
-            if (event.target === modal) {
+        DOMElements.vendorSelect.addEventListener("change", () => {
+            selectedVendor = DOMElements.vendorSelect.value || "auto";
+            applyVendorUI();
+            updatePathInfo("Vendor alterado. Salve novamente para persistir a configuracao desta origem.", "info");
+        });
+        
+        DOMElements.zoomInBtn.addEventListener("click", () => panZoomInstance && panZoomInstance.zoomIn());
+        DOMElements.zoomOutBtn.addEventListener("click", () => panZoomInstance && panZoomInstance.zoomOut());
+        DOMElements.zoomResetBtn.addEventListener("click", () => panZoomInstance && panZoomInstance.reset());
+
+        window.onclick = event => {
+            if (event.target === DOMElements.modal) {
                 closeStructureMap();
             }
         };
 
-        loadServerVersion();
-        loadTiaPath();
-        fetchLogs();
+        document.addEventListener("DOMContentLoaded", async () => {
+            applyVendorUI();
+            await loadProjectSettings();
+            // Nao busca logs no inicio, apenas apos acoes do usuario
+        });
     </script>
 </body>
 </html>
+

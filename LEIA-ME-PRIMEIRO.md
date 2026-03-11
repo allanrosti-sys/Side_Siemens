@@ -1,6 +1,6 @@
-﻿# �Ys� PR�"XIMO PASSO - LEIA PRIMEIRO!
+﻿﻿# 🚀 PRÓXIMO PASSO - LEIA PRIMEIRO!
 
-## �s�️ Bloqueador Identificado: READ-ONLY Context
+## ⚠️ Bloqueador Identificado: READ-ONLY Context
 
 O TIA Portal Openness  **não permite exportar blocos se o projeto foi aberto a partir de um ARQUIVO**.
 
@@ -9,7 +9,7 @@ Projetos abertos na GUI = **write mode** (com permissão de escrita)
 
 ---
 
-## �o. SOLU�?�fO: Abrir TIA Portal manualmente + rodar script
+## ✅ SOLUÇÃO: Abrir TIA Portal manualmente + rodar script
 
 ### **Passo 1: Abrir TIA Portal GUI**
 
@@ -30,7 +30,7 @@ powershell -NoProfile -Command "Start-Process 'C:\Program Files\Siemens\Automati
 ### **Passo 2: Carregar o Projeto**
 
 Dentro da janela TIA Portal:
-1. Menu: **File �?' Open Project**
+1. Menu: **File -> Open Project**
 2. Navegue para: `C:\Users\Administrador\Documents\tirol-ipiranga-os18869_20260224_PE_V20\`
 3. Selecione: `tirol-ipiranga-os18869_20260224_PE_V20.ap20`
 4. Clique: **Open**
@@ -57,11 +57,11 @@ powershell -ExecutionPolicy Bypass -File "C:\Users\Administrador\Documents\tirol
 ### **Passo 4: Validar Resultado**
 
 O script irá:
-1. �o" Verificar que TIA Portal está rodando
-2. �o" Limpar exports anteriores
-3. �o" Rodar exporter em modo **ATTACH** (usando instância aberta)
-4. �o" Contar e listar XMLs gerados
-5. �o" Mostrar resultado final
+1. • Verificar que TIA Portal está rodando
+2. • Limpar exports anteriores
+3. • Rodar exporter em modo **ATTACH** (usando instância aberta)
+4. • Contar e listar XMLs gerados
+5. • Mostrar resultado final
 
 **Resultado Esperado:**
 ```
@@ -108,5 +108,4 @@ Se tiver dúvidas ou problema:
 ---
 
 **Criado:** 27/02/2026 16:20:00  
-**Status:** �Y"� Aguardando ação do usuário
-
+**Status:** ⚠️ Aguardando ação do usuário

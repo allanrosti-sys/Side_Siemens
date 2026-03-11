@@ -10,4 +10,5 @@ Após exportarmos 15 blocos com sucesso, a próxima fase é **reconstruí-los** 
 
 ```powershell
 cd "C:\Users\Administrador\Documents\tirol-ipiranga-os18869_20260224_PE_V20\Logs"
-.\
+.\Import-New-Blocks.ps1
+```

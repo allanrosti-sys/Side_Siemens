@@ -36,5 +36,3 @@ Keep all assistants aligned through repository files, so the user does not need 
 2. Runtime test command:
    - `.\Logs\TiaProjectExporter_v20.exe --no-attach .\tirol-ipiranga-os18869_20260224_PE_V20.ap20 .\Logs\ControlModules_Export`
 3. If blocked by TIA Openness prompts, log it in `AI_SYNC.md` and do not mask the issue.
-
-

@@ -12,46 +12,60 @@ import {
 
 import DetailPanel from "../components/DetailPanel";
 import FilterPanel, { type FilterState } from "../components/FilterPanel";
-import type { GraphEdge, GraphNode, GraphPayload } from "../types/graph";
+import type { GraphEdge, GraphNode, GraphPayload, VendorType } from "../types/graph";
 
-const API_BASE = "http://localhost:8011";
+const API_BASE = "http://localhost:8021";
+
+const buildColumnMap = (vendor: VendorType): Record<string, number> => {
+  if (vendor === "rockwell") {
+    return { Task: 0, MainProgram: 1, Routine: 2, AOI: 3, TAG: 4, EXTERNAL: 5 };
+  }
+  return { OB: 0, FB: 1, FC: 2, DB: 3, EXTERNAL: 4 };
+};
 
 export default function MapPage() {
   const [allNodes, setAllNodes] = useState<GraphNode[]>([]);
   const [allEdges, setAllEdges] = useState<GraphEdge[]>([]);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [activeVendor, setActiveVendor] = useState<VendorType>("auto");
 
   const [filters, setFilters] = useState<FilterState>({
     searchTerm: "",
+    vendor: "auto",
     showOB: true,
     showFB: true,
     showFC: true,
     showDB: true,
     showExternal: true,
+    showTask: true,
+    showMainProgram: true,
+    showRoutine: true,
+    showAOI: true,
+    showTag: true,
   });
 
-  const applyInitialLayout = useCallback((nodes: GraphNode[]): GraphNode[] => {
+  const applyInitialLayout = useCallback((nodes: GraphNode[], vendor: VendorType): GraphNode[] => {
     const hasAnyPosition = nodes.some((node) => (node.position?.x ?? 0) !== 0 || (node.position?.y ?? 0) !== 0);
     if (hasAnyPosition) {
       return nodes;
     }
 
-    const columns: Record<string, number> = { OB: 0, FB: 1, FC: 2, DB: 3, EXTERNAL: 4 };
+    const columns = buildColumnMap(vendor);
     const rowByType = new Map<string, number>();
 
     return [...nodes]
       .sort((a, b) => String(a.data.label).localeCompare(String(b.data.label)))
       .map((node) => {
-        const type = String(node.data.blockType ?? "EXTERNAL").toUpperCase();
-        const column = columns[type] ?? 5;
+        const type = String(node.data.blockType ?? "EXTERNAL");
+        const column = columns[type] ?? Object.keys(columns).length;
         const currentRow = rowByType.get(type) ?? 0;
         rowByType.set(type, currentRow + 1);
 
         return {
           ...node,
           position: {
-            x: 260 + column * 360,
+            x: 260 + column * 340,
             y: 120 + currentRow * 130,
           },
         };
@@ -61,14 +75,16 @@ export default function MapPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const response = await fetch(`${API_BASE}/api/graph/demo`);
+        const response = await fetch(`${API_BASE}/api/graph/demo?vendor=${filters.vendor}`);
         if (!response.ok) {
           throw new Error(`Falha HTTP ${response.status}`);
         }
         const data: GraphPayload = await response.json();
-        const initialNodes = applyInitialLayout((data.nodes ?? []) as GraphNode[]);
+        const resolvedVendor = (data.vendor ?? filters.vendor ?? "auto") as VendorType;
+        const initialNodes = applyInitialLayout((data.nodes ?? []) as GraphNode[], resolvedVendor);
         setAllNodes(initialNodes);
         setAllEdges((data.edges ?? []) as GraphEdge[]);
+        setActiveVendor(resolvedVendor);
         setLoadError(null);
       } catch (error) {
         console.error("Erro ao carregar grafo:", error);
@@ -77,7 +93,7 @@ export default function MapPage() {
     };
 
     fetchData();
-  }, [applyInitialLayout]);
+  }, [applyInitialLayout, filters.vendor]);
 
   const filteredNodes = useMemo(() => {
     return allNodes.filter((node) => {
@@ -94,6 +110,11 @@ export default function MapPage() {
       if (type === "FB" && !filters.showFB) return false;
       if (type === "FC" && !filters.showFC) return false;
       if (type === "DB" && !filters.showDB) return false;
+      if (type === "Task" && !filters.showTask) return false;
+      if (type === "MainProgram" && !filters.showMainProgram) return false;
+      if (type === "Routine" && !filters.showRoutine) return false;
+      if (type === "AOI" && !filters.showAOI) return false;
+      if (type === "TAG" && !filters.showTag) return false;
       if (type === "EXTERNAL" && !filters.showExternal) return false;
 
       return true;
@@ -133,11 +154,11 @@ export default function MapPage() {
         <FilterPanel onFilterChange={setFilters} />
         {loadError ? (
           <div className="tm-banner error">
-            Erro ao conectar no backend (porta 8011). Verifique o launcher do TIA Map.
+            Erro ao conectar no backend (porta 8021). Verifique o launcher do Puchta PLC Insight.
           </div>
         ) : (
           <div className="tm-banner">
-            Blocos visiveis: {filteredNodes.length} | Conexoes: {filteredEdges.length}
+            Vendor: {activeVendor} | Elementos visiveis: {filteredNodes.length} | Conexoes: {filteredEdges.length}
           </div>
         )}
 

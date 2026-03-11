@@ -1,10 +1,10 @@
-﻿# Script: WebServer.ps1
+# Script: WebServer.ps1
 # Objetivo: Servidor Web para controlar automacao TIA e visualizar estrutura do projeto.
 # Autor: Equipe de IAs (Gemini/Copilot/Codex)
 # Data: 2026-03-02
 
 param(
-    [int]$Port = 8090
+    [int]$Port = 8099
 )
 
 $ErrorActionPreference = 'Stop'
@@ -23,25 +23,95 @@ $projectRoot = Split-Path -Parent $scriptRoot
 $exportRoot = Join-Path $scriptRoot "ControlModules_Export"
 $settingsFile = Join-Path $scriptRoot "web_settings.json"
 $selectedTiaPath = $null
+$selectedVendor = "auto"
 
+# Carrega o ultimo caminho de projeto configurado a partir de um arquivo JSON.
 if (Test-Path $settingsFile) {
     try {
         $settings = Get-Content -Path $settingsFile -Raw -Encoding UTF8 | ConvertFrom-Json
         if ($settings.tiaPath) {
             $selectedTiaPath = [string]$settings.tiaPath
         }
+        if ($settings.vendor) {
+            $selectedVendor = ([string]$settings.vendor).ToLowerInvariant()
+        }
     } catch {
         Write-Warning "Falha ao ler web_settings.json: $($_.Exception.Message)"
     }
 }
 
+# Salva o caminho do projeto selecionado no arquivo de configuracao JSON.
 function Save-WebSettings {
-    param([string]$TiaPath)
-    $obj = @{ tiaPath = $TiaPath }
+    param(
+        [string]$TiaPath,
+        [string]$Vendor,
+        [int]$Port
+    )
+    $normalizedVendor = if ([string]::IsNullOrWhiteSpace($Vendor)) { "auto" } else { $Vendor.ToLowerInvariant() }
+    $existing = $null
+    if (Test-Path $settingsFile) {
+        try {
+            $existing = Get-Content -Path $settingsFile -Raw -Encoding UTF8 | ConvertFrom-Json
+        } catch {
+            $existing = $null
+        }
+    }
+    $effectivePort = if ($Port) { $Port } elseif ($existing -and $existing.port) { [int]$existing.port } else { $null }
+    $obj = @{
+        tiaPath = $TiaPath
+        vendor = $normalizedVendor
+    }
+    if ($effectivePort) {
+        $obj.port = $effectivePort
+    }
     $json = $obj | ConvertTo-Json -Compress
     Set-Content -Path $settingsFile -Value $json -Encoding UTF8
 }
 
+# Atualiza o arquivo de configuracao com a porta atual para auxiliar scripts auxiliares.
+Save-WebSettings -TiaPath $selectedTiaPath -Vendor $selectedVendor -Port $Port
+
+# Detecta o vendor efetivo do projeto com base na selecao do usuario ou na origem.
+function Get-ProjectVendor {
+    param(
+        [string]$BasePath,
+        [string]$ConfiguredVendor
+    )
+
+    $normalizedVendor = if ([string]::IsNullOrWhiteSpace($ConfiguredVendor)) { "auto" } else { $ConfiguredVendor.ToLowerInvariant() }
+    if ($normalizedVendor -in @("siemens", "rockwell")) {
+        return $normalizedVendor
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($BasePath) -and (Test-Path $BasePath)) {
+        $item = Get-Item -LiteralPath $BasePath -ErrorAction SilentlyContinue
+        if ($item -and -not $item.PSIsContainer) {
+            $ext = $item.Extension.ToLowerInvariant()
+            if ($ext -in @(".l5x", ".l5k")) { return "rockwell" }
+            if ($ext -in @(".ap20", ".ap19")) { return "siemens" }
+        } else {
+            $hasL5x = Get-ChildItem -Path $BasePath -Include *.L5X, *.l5k -File -Recurse -Depth 1 -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($hasL5x) { return "rockwell" }
+
+            $hasSiemensProject = Get-ChildItem -Path $BasePath -Include *.ap20, *.ap19, *.xml -File -Recurse -Depth 1 -ErrorAction SilentlyContinue |
+                Where-Object { $_.Extension -in @(".ap20", ".ap19") -or $_.BaseName -match '^(OB|FB|FC|DB)_' } |
+                Select-Object -First 1
+            if ($hasSiemensProject) { return "siemens" }
+        }
+    }
+
+    return "auto"
+}
+
+# Funcao para sanitizar texto para uso em labels do Mermaid.
+function Sanitize-MermaidLabel([string]$label) {
+    if ([string]::IsNullOrWhiteSpace($label)) { return '""' }
+    # Substitui aspas duplas por uma entidade e envolve o resultado em aspas para o Mermaid.
+    $sanitized = $label.Replace('"', '#quot;')
+    return "`"$sanitized`""
+}
+
+# Resolve o caminho correto da pasta de exportacao de XMLs, testando varios locais possiveis.
 function Resolve-ExportPath {
     param([string]$BasePath, [string]$FallbackPath)
 
@@ -54,6 +124,7 @@ function Resolve-ExportPath {
     }
     $candidates.Add($FallbackPath)
 
+    # Funcao interna para contar apenas XMLs de blocos validos (OB, FB, FC).
     function Get-BlockXmlCount([string]$candidatePath) {
         $blockFiles = Get-ChildItem -Path $candidatePath -Filter *.xml -File -Recurse -ErrorAction SilentlyContinue |
             Where-Object { $_.BaseName -match '^(OB|FB|FC)_' }
@@ -72,7 +143,73 @@ function Resolve-ExportPath {
     return $FallbackPath
 }
 
-# --- FUNCAO: GERAR DIAGRAMA MERMAID ---
+# Resolve o arquivo Rockwell (.L5X ou .L5K) a partir da origem informada.
+function Resolve-RockwellSource {
+    param([string]$BasePath)
+
+    if ([string]::IsNullOrWhiteSpace($BasePath)) {
+        return @{
+            status = "error"
+            message = "Caminho vazio para origem Rockwell."
+            path = $null
+        }
+    }
+
+    if (-not (Test-Path $BasePath)) {
+        return @{
+            status = "error"
+            message = "Caminho informado nao existe."
+            path = $null
+        }
+    }
+
+    $item = Get-Item -LiteralPath $BasePath -ErrorAction SilentlyContinue
+    if (-not $item) {
+        return @{
+            status = "error"
+            message = "Nao foi possivel abrir a origem selecionada."
+            path = $null
+        }
+    }
+
+    if (-not $item.PSIsContainer) {
+        $ext = $item.Extension.ToLowerInvariant()
+        if ($ext -in @(".l5x", ".l5k")) {
+            return @{
+                status = "success"
+                message = "Arquivo Rockwell detectado."
+                path = $item.FullName
+                extension = $ext
+            }
+        }
+        return @{
+            status = "error"
+            message = "Arquivo nao suportado para Rockwell. Use .L5X ou .L5K."
+            path = $item.FullName
+        }
+    }
+
+    $candidate = Get-ChildItem -Path $item.FullName -Include *.L5X, *.l5k -File -Recurse -Depth 2 -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 1
+
+    if ($candidate) {
+        return @{
+            status = "success"
+            message = "Arquivo Rockwell encontrado na pasta."
+            path = $candidate.FullName
+            extension = $candidate.Extension.ToLowerInvariant()
+        }
+    }
+
+    return @{
+        status = "error"
+        message = "Nenhum arquivo .L5X ou .L5K encontrado na pasta selecionada."
+        path = $null
+    }
+}
+
+# --- FUNCAO: GERAR DIAGRAMA MERMAID (SIEMENS) ---
 # Gera a definicao de grafico para o Mermaid.js baseada na estrutura de pastas exportada
 function New-ProjectMermaid {
     param([string]$ExportPath)
@@ -110,9 +247,10 @@ function New-ProjectMermaid {
     foreach ($dir in $topDirs) {
         $index++
         $node = "G$index"
-        $safeName = $dir.Name.Replace('"', "'")
         $xmlCount = (Get-ChildItem -Path $dir.FullName -Filter *.xml -File -Recurse -ErrorAction SilentlyContinue | Measure-Object).Count
-        $lines.Add("  ROOT --> $node[`"$safeName ($xmlCount)`"]")
+        $label = "$($dir.Name) ($xmlCount)"
+        $sanitizedLabel = Sanitize-MermaidLabel -label $label
+        $lines.Add("  ROOT --> $node[$sanitizedLabel]")
     }
 
     # Expande estrutura de blocos (limitado para evitar diagrama gigante).
@@ -127,15 +265,16 @@ function New-ProjectMermaid {
         if (-not $folderNodes.ContainsKey($relativeFolder)) {
             $folderId = "F$($folderNodes.Count + 1)"
             $folderNodes[$relativeFolder] = $folderId
-            $safeFolder = $relativeFolder.Replace('\', '/').Replace('"', "'")
-            $lines.Add("  ROOT --> $folderId[`"$safeFolder`"]")
+            $sanitizedFolder = Sanitize-MermaidLabel -label $relativeFolder.Replace('\', '/')
+            $lines.Add("  ROOT --> $folderId[$sanitizedFolder]")
         }
 
         $bIndex++
         $blockId = "B$bIndex"
-        $base = $file.BaseName.Replace('"', "'")
+        $base = $file.BaseName
         $label = if ($base.Length -gt 42) { $base.Substring(0, 42) + "..." } else { $base }
-        $lines.Add("  $($folderNodes[$relativeFolder]) --> $blockId[`"$label`"]")
+        $sanitizedBlockLabel = Sanitize-MermaidLabel -label $label
+        $lines.Add("  $($folderNodes[$relativeFolder]) --> $blockId[$sanitizedBlockLabel]")
     }
 
     if ($allXml.Count -gt $maxBlockNodes) {
@@ -146,7 +285,7 @@ function New-ProjectMermaid {
     return ($lines -join "`n")
 }
 
-# --- FUNCAO: GERAR DIAGRAMA DE EXECUCAO (CALL GRAPH) ---
+# --- FUNCAO: GERAR DIAGRAMA DE EXECUCAO (CALL GRAPH - SIEMENS) ---
 # Le os XML exportados e monta um fluxo de chamadas entre OB/FC/FB/DB.
 function New-ExecutionMermaid {
     param([string]$ExportPath)
@@ -160,6 +299,7 @@ function New-ExecutionMermaid {
         return ($lines -join "`n")
     }
 
+    # Funcao interna para criar um ID seguro para nos do Mermaid.
     function Get-SafeId([string]$text) {
         if ([string]::IsNullOrWhiteSpace($text)) { return "N_EMPTY" }
         $safe = ($text -replace '[^A-Za-z0-9_]', '_')
@@ -180,6 +320,7 @@ function New-ExecutionMermaid {
     $incomingCount = @{}
     $edgeSet = New-Object 'System.Collections.Generic.HashSet[string]'
 
+    # Itera sobre cada arquivo XML para extrair informacoes de chamada.
     foreach ($file in $xmlFiles) {
         $content = Get-Content -Path $file.FullName -Raw -Encoding UTF8
 
@@ -267,8 +408,9 @@ function New-ExecutionMermaid {
 
     # Declara todos os nos no fim para aplicar labels completos.
     foreach ($nodeId in $nodeMap.Keys) {
-        $label = $nodeMap[$nodeId].Replace('"', "'")
-        $lines.Add("  $nodeId[`"$label`"]")
+        $label = $nodeMap[$nodeId]
+        $sanitizedLabel = Sanitize-MermaidLabel -label $label
+        $lines.Add("  $nodeId[$sanitizedLabel]")
     }
 
     # Paleta semantica por tipo de bloco.
@@ -283,6 +425,97 @@ function New-ExecutionMermaid {
         elseif ($label.StartsWith("FB ")) { $lines.Add("  class $nodeId fb;") }
         elseif ($label.StartsWith("FC ")) { $lines.Add("  class $nodeId fc;") }
         elseif ($label.StartsWith("DB ")) { $lines.Add("  class $nodeId db;") }
+    }
+
+    return ($lines -join "`n")
+}
+
+# --- FUNCAO: GERAR DIAGRAMA DE ESTRUTURA/EXECUCAO (ROCKWELL L5K) ---
+# Le um arquivo L5K e monta um fluxo de chamadas entre Programas e Rotinas.
+function New-RockwellMermaid {
+    param(
+        [Alias("L5xPath")]
+        [string]$L5kPath
+    )
+    
+    $lines = New-Object System.Collections.Generic.List[string]
+    $lines.Add("graph TD")
+    $lines.Add("  classDef program fill:#c2185b,color:#fff,stroke:#ad1457,stroke-width:2px;")
+    $lines.Add("  classDef routine fill:#2e7d32,color:#fff,stroke:#256a2a,stroke-width:2px;")
+    $lines.Add("  classDef callout fill:#f5f5f5,color:#333,stroke:#ccc;")
+    
+    # Funcao interna para criar um ID seguro para nos do Mermaid.
+    function Get-SafeId([string]$text) {
+        if ([string]::IsNullOrWhiteSpace($text)) { return "N_EMPTY" }
+        $safe = ($text -replace '[^A-Za-z0-9_]', '_')
+        if ($safe -match '^[0-9]') { $safe = "N_$safe" }
+        return "N_$safe"
+    }
+
+    if (-not (Test-Path $L5kPath)) {
+        $lines.Add("  ROOT((Arquivo L5K nao encontrado))")
+        return ($lines -join "`n")
+    }
+
+    try {
+        $fileContent = Get-Content -Path $L5kPath -Raw
+        $extension = ([System.IO.Path]::GetExtension($L5kPath)).ToLowerInvariant()
+        if ($extension -eq ".l5x") {
+            $lines.Add("  ROOT((Arquivo L5X detectado))")
+            $lines.Add("  ROOT --> INFO[`"L5X requer parser XML dedicado. Use o Puchta PLC Insight para analise completa.`"]")
+            return ($lines -join "`n")
+        }
+        
+        # Regex para encontrar o nome do Controller
+        $controllerName = "Rockwell Project"
+        $controllerMatch = [regex]::Match($fileContent, 'CONTROLLER\s+([\w-]+)')
+        if ($controllerMatch.Success) {
+            $controllerName = $controllerMatch.Groups[1].Value
+        }
+        $rootId = Get-SafeId -text $controllerName
+        $lines.Add("  $rootId[($controllerName)]")
+        $lines.Add("  class $rootId callout;")
+
+        # Regex para encontrar todos os programas e suas rotinas
+        $programPattern = 'PROGRAM\s+([\w-]+)(.*?)\bEND_PROGRAM\b'
+        $programMatches = [regex]::Matches($fileContent, $programPattern, "Singleline")
+
+        foreach ($pMatch in $programMatches) {
+            $progName = $pMatch.Groups[1].Value
+            $progId = Get-SafeId -text $progName
+            $progLabel = Sanitize-MermaidLabel -label $progName
+            
+            $lines.Add("  $rootId --> $progId{$progLabel}")
+            $lines.Add("  class $progId program;")
+
+            $programContent = $pMatch.Groups[2].Value
+            $routinePattern = 'ROUTINE\s+([\w-]+)(.*?)\bEND_ROUTINE\b'
+            $routineMatches = [regex]::Matches($programContent, $routinePattern, "Singleline")
+
+            foreach ($rMatch in $routineMatches) {
+                $routName = $rMatch.Groups[1].Value
+                $routId = Get-SafeId -text "${progName}_${routName}"
+                $routLabel = Sanitize-MermaidLabel -label $routName
+                
+                $lines.Add("  $progId --> $routId[$routLabel]")
+                $lines.Add("  class $routId routine;")
+                
+                $routineContent = $rMatch.Groups[2].Value
+                
+                # Regex para capturar JSR(NomeRotina)
+                $jsrPattern = 'JSR\s*\(\s*([\w-]+)'
+                $jsrMatches = [regex]::Matches($routineContent, $jsrPattern, "IgnoreCase")
+                
+                foreach ($jsrMatch in $jsrMatches) {
+                    $targetName = $jsrMatch.Groups[1].Value
+                    $targetId = Get-SafeId -text "${progName}_${targetName}"
+                    $lines.Add("  $routId -.-> $targetId")
+                }
+            }
+        }
+
+    } catch {
+        $lines.Add("  ERR[Erro no parse L5K: $($_.Exception.Message)]")
     }
 
     return ($lines -join "`n")
@@ -304,6 +537,7 @@ while ($listener.IsListening) {
     $statusCode = 200
 
     try {
+        # ROTEAMENTO: Decide qual acao tomar com base no caminho da URL.
         # ROTA: Pagina Principal (index.html)
         if ($path -eq "/" -or $path -eq "/index.html") {
             $htmlPath = Join-Path $scriptRoot "index.html"
@@ -314,7 +548,7 @@ while ($listener.IsListening) {
                 $statusCode = 404
             }
         }
-        # ROTA: Documento HTML gerado (DocumentacaoDoProjeto)
+        # ROTA: Documento HTML gerado (Siemens ou Rockwell conforme URL)
         elseif ($path -eq "/DocumentacaoDoProjeto.html") {
             $docCandidates = @(
                 (Join-Path $projectRoot "DocumentacaoDoProjeto.html"),
@@ -324,7 +558,20 @@ while ($listener.IsListening) {
             if ($docPath) {
                 $content = [System.IO.File]::ReadAllText($docPath, [System.Text.Encoding]::UTF8)
             } else {
-                $content = "<h1>Documentacao ainda nao gerada.</h1><p>Use o botao 4 para gerar.</p>"
+                $content = "<h1>Documentacao Siemens ainda nao gerada.</h1><p>Use o botao 4 para gerar.</p>"
+                $statusCode = 404
+            }
+        }
+        elseif ($path -eq "/DocumentacaoRockwell.html") {
+            $docCandidates = @(
+                (Join-Path $projectRoot "DocumentacaoRockwell.html"),
+                (Join-Path $scriptRoot "DocumentacaoRockwell.html")
+            )
+            $docPath = $docCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+            if ($docPath) {
+                $content = [System.IO.File]::ReadAllText($docPath, [System.Text.Encoding]::UTF8)
+            } else {
+                $content = "<h1>Documentacao Rockwell ainda nao gerada.</h1><p>Use o botao 4 para gerar.</p>"
                 $statusCode = 404
             }
         }
@@ -337,6 +584,7 @@ while ($listener.IsListening) {
                 capabilities = @(
                     "run-scripts",
                     "project-path",
+                    "vendor-selection",
                     "mermaid-structure",
                     "mermaid-execution",
                     "documentation-popup"
@@ -359,7 +607,8 @@ while ($listener.IsListening) {
                 "Import-New-Blocks.ps1",
                 "Run-Full-Cycle.ps1",
                 "Generate-Documentation.ps1",
-                "Run-TiaMap-Dev.ps1" # Novo script para iniciar o TIA Map
+                "Generate-Documentation-Rockwell.ps1",
+                "Run-TiaMap-Dev.ps1"
             )
 
             # Verifica se o script esta na lista permitida e se existe no disco
@@ -376,10 +625,13 @@ while ($listener.IsListening) {
                 $targetScript = $null
             }
 
+            $skipExecution = $false
             if ($targetScript) {
-                # Preparar argumentos baseados no caminho configurado
+                # Preparar argumentos baseados no caminho configurado e no vendor efetivo.
                 $scriptArgs = @()
-                $resolvedFromSelection = Resolve-ExportPath -BasePath $selectedTiaPath -FallbackPath $exportRoot
+                $effectiveVendor = Get-ProjectVendor -BasePath $selectedTiaPath -ConfiguredVendor $selectedVendor
+                $resolvedFromSelection = if ($effectiveVendor -eq "siemens") { Resolve-ExportPath -BasePath $selectedTiaPath -FallbackPath $exportRoot } else { $null }
+                $rockwellSource = if ($effectiveVendor -eq "rockwell") { Resolve-RockwellSource -BasePath $selectedTiaPath } else { $null }
                 if (-not [string]::IsNullOrWhiteSpace($selectedTiaPath) -and (Test-Path $selectedTiaPath)) {
                     Write-Host "DEBUG: Caminho TIA configurado: '$selectedTiaPath'" -ForegroundColor DarkGray
 
@@ -395,15 +647,44 @@ while ($listener.IsListening) {
                         }
                     }
                     elseif ($scriptName -eq "Generate-Documentation.ps1") {
+                        if ($effectiveVendor -eq "rockwell") {
+                            $rockwellDoc = "Generate-Documentation-Rockwell.ps1"
+                            $possibleRockwell = @(
+                                (Join-Path $scriptRoot $rockwellDoc),
+                                (Join-Path $projectRoot $rockwellDoc),
+                                (Join-Path (Join-Path $projectRoot "Logs") $rockwellDoc)
+                            )
+                            $rockwellScript = $possibleRockwell | Where-Object { Test-Path $_ } | Select-Object -First 1
+                            if ($rockwellScript) {
+                                $targetScript = $rockwellScript
+                                $scriptName = $rockwellDoc
+                                $scriptArgs = @("-InputPath", $selectedTiaPath)
+                            } else {
+                                $content = (@{
+                                    status = "error"
+                                    message = "Script de documentacao Rockwell nao encontrado."
+                                } | ConvertTo-Json -Compress)
+                                $statusCode = 500
+                                $contentType = "application/json; charset=utf-8"
+                                $skipExecution = $true
+                            }
+                        }
                         if ($resolvedFromSelection -and (Test-Path $resolvedFromSelection)) {
                             $scriptArgs = @("-InputPath", $resolvedFromSelection)
                             Write-Host ("DEBUG: Doc Args: " + ($scriptArgs -join " ")) -ForegroundColor DarkGray
                         }
                     }
                     elseif ($scriptName -eq "Run-TiaMap-Dev.ps1") {
-                        if ($resolvedFromSelection -and (Test-Path $resolvedFromSelection)) {
-                            $scriptArgs = @("-DataPath", $resolvedFromSelection)
-                            Write-Host ("DEBUG: TIA Map Args: " + ($scriptArgs -join " ")) -ForegroundColor DarkGray
+                        if ($effectiveVendor -eq "rockwell") {
+                            if ($rockwellSource -and $rockwellSource.status -eq "success" -and (Test-Path $rockwellSource.path)) {
+                                $scriptArgs = @("-DataPath", $rockwellSource.path)
+                                Write-Host ("DEBUG: TIA Map Args (Rockwell): " + ($scriptArgs -join " ")) -ForegroundColor DarkGray
+                            }
+                        } else {
+                            if ($resolvedFromSelection -and (Test-Path $resolvedFromSelection)) {
+                                $scriptArgs = @("-DataPath", $resolvedFromSelection)
+                                Write-Host ("DEBUG: TIA Map Args: " + ($scriptArgs -join " ")) -ForegroundColor DarkGray
+                            }
                         }
                     }
                     elseif ($scriptName -eq "Import-New-Blocks.ps1") {
@@ -422,9 +703,14 @@ while ($listener.IsListening) {
                     }
                 }
 
-                Write-Host ("Executando: " + $scriptName + " " + ($scriptArgs -join " ")) -ForegroundColor Yellow
+                if (-not $skipExecution) {
+                    Write-Host ("Executando: " + $scriptName + " " + ($scriptArgs -join " ")) -ForegroundColor Yellow
+                }
 
-                if ($scriptName -eq "Generate-Documentation.ps1") {
+                if ($skipExecution) {
+                    # Retorna o erro definido anteriormente sem executar script.
+                }
+                elseif ($scriptName -eq "Generate-Documentation.ps1" -or $scriptName -eq "Generate-Documentation-Rockwell.ps1") {
                     # Para documentacao, retorna URL final para o frontend abrir popup.
                     if ($scriptArgs.Count -gt 0) {
                         powershell -ExecutionPolicy Bypass -File $targetScript @scriptArgs | Out-Null
@@ -432,33 +718,53 @@ while ($listener.IsListening) {
                         powershell -ExecutionPolicy Bypass -File $targetScript | Out-Null
                     }
 
-                    $docCandidates = @(
-                        (Join-Path $projectRoot "DocumentacaoDoProjeto.html"),
-                        (Join-Path $scriptRoot "DocumentacaoDoProjeto.html")
-                    )
-                    $docGenerated = $docCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+                    $docGenerated = $null
+                    if ($scriptName -eq "Generate-Documentation-Rockwell.ps1") {
+                        $rockwellCandidates = @(
+                            (Join-Path $projectRoot "DocumentacaoRockwell.html"),
+                            (Join-Path $scriptRoot "DocumentacaoRockwell.html")
+                        )
+                        $docGenerated = $rockwellCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+                    } else {
+                        $siemensCandidates = @(
+                            (Join-Path $projectRoot "DocumentacaoDoProjeto.html"),
+                            (Join-Path $scriptRoot "DocumentacaoDoProjeto.html")
+                        )
+                        $docGenerated = $siemensCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+                    }
+
                     if ($docGenerated) {
+                        $docName = Split-Path -Leaf $docGenerated
                         $content = (@{
                             status = "success"
                             message = "Documentacao gerada com sucesso."
-                            docUrl = "/DocumentacaoDoProjeto.html"
+                            docUrl = "/$docName"
                         } | ConvertTo-Json -Compress)
                     } else {
                         $content = (@{
                             status = "error"
-                            message = "Script executado, mas DocumentacaoDoProjeto.html nao foi encontrado."
+                            message = "Script executado, mas o HTML nao foi encontrado."
                         } | ConvertTo-Json -Compress)
                         $statusCode = 500
                     }
                 } else {
-                    # Inicia o script em job separado para nao travar a UI.
+                    # Cria um arquivo de log unico para este job.
+                    $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
+                    $logFileName = "run_log_{$timestamp}.txt"
+                    $logFilePath = Join-Path $scriptRoot $logFileName
+                    
+                    # Inicia o script em job separado e redireciona toda a saida para o arquivo de log.
                     Start-Job -ScriptBlock {
-                        param($s, $a)
-                        if ($a -and $a.Count -gt 0) { powershell -ExecutionPolicy Bypass -File $s @a }
-                        else { powershell -ExecutionPolicy Bypass -File $s }
-                    } -ArgumentList $targetScript, $scriptArgs | Out-Null
+                        param($target, $arguments, $log)
+                        # O operador '&' executa o comando/script, e '@' faz o "splatting" do array de argumentos.
+                        & $target @arguments *>&1 | Out-File -FilePath $log -Encoding utf8
+                    } -ArgumentList $targetScript, $scriptArgs, $logFilePath | Out-Null
 
-                    $content = (@{ status = "success"; message = "Script iniciado em background." } | ConvertTo-Json -Compress)
+                    $content = (@{ 
+                        status = "success"; 
+                        message = "Script iniciado em background.";
+                        logPath = $logFilePath
+                    } | ConvertTo-Json -Compress)
                 }
                 $contentType = "application/json; charset=utf-8"
             } else {
@@ -479,14 +785,31 @@ while ($listener.IsListening) {
         }
         # ROTA: Configuracao de caminho TIA (/api/project-path)
         elseif ($path -eq "/api/project-path" -and $method -eq "GET") {
-            $resolvedPath = Resolve-ExportPath -BasePath $selectedTiaPath -FallbackPath $exportRoot
-            $xmlCount = (Get-ChildItem -Path $resolvedPath -Filter *.xml -File -Recurse -ErrorAction SilentlyContinue | Measure-Object).Count
-            $content = (@{
-                status = "success"
-                tiaPath = $selectedTiaPath
-                resolvedExportPath = $resolvedPath
-                xmlCount = $xmlCount
-            } | ConvertTo-Json -Compress)
+            $detectedVendor = Get-ProjectVendor -BasePath $selectedTiaPath -ConfiguredVendor $selectedVendor
+            if ($detectedVendor -eq "rockwell") {
+                $rockwellSource = Resolve-RockwellSource -BasePath $selectedTiaPath
+                $content = (@{
+                    status = "success"
+                    tiaPath = $selectedTiaPath
+                    vendor = $selectedVendor
+                    detectedVendor = $detectedVendor
+                    rockwellSource = $rockwellSource.path
+                    rockwellStatus = $rockwellSource.message
+                    resolvedExportPath = $null
+                    xmlCount = 0
+                } | ConvertTo-Json -Compress)
+            } else {
+                $resolvedPath = Resolve-ExportPath -BasePath $selectedTiaPath -FallbackPath $exportRoot
+                $xmlCount = (Get-ChildItem -Path $resolvedPath -Filter *.xml -File -Recurse -ErrorAction SilentlyContinue | Measure-Object).Count
+                $content = (@{
+                    status = "success"
+                    tiaPath = $selectedTiaPath
+                    vendor = $selectedVendor
+                    detectedVendor = $detectedVendor
+                    resolvedExportPath = $resolvedPath
+                    xmlCount = $xmlCount
+                } | ConvertTo-Json -Compress)
+            }
             $contentType = "application/json; charset=utf-8"
         }
         elseif ($path -eq "/api/project-path" -and $method -eq "POST") {
@@ -496,6 +819,11 @@ while ($listener.IsListening) {
 
             $json = $body | ConvertFrom-Json
             $candidatePath = ([string]$json.path).Trim()
+            $candidateVendor = if ($json.vendor) { ([string]$json.vendor).Trim().ToLowerInvariant() } else { "auto" }
+
+            if ($candidateVendor -notin @("auto", "siemens", "rockwell")) {
+                $candidateVendor = "auto"
+            }
 
             if ([string]::IsNullOrWhiteSpace($candidatePath) -or -not (Test-Path $candidatePath)) {
                 $content = (@{ status = "error"; message = "Caminho invalido ou inexistente." } | ConvertTo-Json -Compress)
@@ -503,39 +831,59 @@ while ($listener.IsListening) {
                 $contentType = "application/json; charset=utf-8"
             } else {
                 $selectedTiaPath = $candidatePath
-                Save-WebSettings -TiaPath $selectedTiaPath
+                $selectedVendor = $candidateVendor
+                Save-WebSettings -TiaPath $selectedTiaPath -Vendor $selectedVendor -Port $Port
 
-                $resolvedPath = Resolve-ExportPath -BasePath $selectedTiaPath -FallbackPath $exportRoot
-                $xmlCount = (Get-ChildItem -Path $resolvedPath -Filter *.xml -File -Recurse -ErrorAction SilentlyContinue | Measure-Object).Count
-                $content = (@{
-                    status = "success"
-                    message = "Caminho salvo com sucesso."
-                    tiaPath = $selectedTiaPath
-                    resolvedExportPath = $resolvedPath
-                    xmlCount = $xmlCount
-                } | ConvertTo-Json -Compress)
+                $detectedVendor = Get-ProjectVendor -BasePath $selectedTiaPath -ConfiguredVendor $selectedVendor
+                if ($detectedVendor -eq "rockwell") {
+                    $rockwellSource = Resolve-RockwellSource -BasePath $selectedTiaPath
+                    $content = (@{
+                        status = "success"
+                        message = "Caminho salvo com sucesso."
+                        tiaPath = $selectedTiaPath
+                        vendor = $selectedVendor
+                        detectedVendor = $detectedVendor
+                        rockwellSource = $rockwellSource.path
+                        rockwellStatus = $rockwellSource.message
+                        resolvedExportPath = $null
+                        xmlCount = 0
+                    } | ConvertTo-Json -Compress)
+                } else {
+                    $resolvedPath = Resolve-ExportPath -BasePath $selectedTiaPath -FallbackPath $exportRoot
+                    $xmlCount = (Get-ChildItem -Path $resolvedPath -Filter *.xml -File -Recurse -ErrorAction SilentlyContinue | Measure-Object).Count
+                    $content = (@{
+                        status = "success"
+                        message = "Caminho salvo com sucesso."
+                        tiaPath = $selectedTiaPath
+                        vendor = $selectedVendor
+                        detectedVendor = $detectedVendor
+                        resolvedExportPath = $resolvedPath
+                        xmlCount = $xmlCount
+                    } | ConvertTo-Json -Compress)
+                }
                 $contentType = "application/json; charset=utf-8"
             }
         }
         # ROTA: Obter Logs (/api/logs)
         elseif ($path -eq "/api/logs") {
-            $logFile = Get-ChildItem -Path $scriptRoot -Filter "run_output_*.txt" -File -ErrorAction SilentlyContinue |
-                Sort-Object LastWriteTime -Descending |
-                Select-Object -First 1
-
-            if ($null -ne $logFile) {
-                $logContent = Get-Content -Path $logFile.FullName -Raw -Encoding UTF8
-                if ($logContent -is [System.Array]) {
-                    $logContent = ($logContent -join "`n")
+            $logPath = $request.QueryString["logPath"]
+            if ([string]::IsNullOrWhiteSpace($logPath)) {
+                # Sem logPath: retorna o ultimo log conhecido para facilitar a UX.
+                $latest = Get-ChildItem -Path $scriptRoot -Filter "run_log_*.txt" -File -ErrorAction SilentlyContinue |
+                    Sort-Object LastWriteTime -Descending |
+                    Select-Object -First 1
+                if ($latest) {
+                    $logContent = Get-Content -Path $latest.FullName -Raw -Encoding UTF8
+                    $content = (@{ log = $logContent } | ConvertTo-Json -Compress)
+                } else {
+                    $content = (@{ log = "Nenhum log encontrado ainda." } | ConvertTo-Json -Compress)
                 }
-                if ($logContent -isnot [string]) {
-                    $logContent = [string]$logContent
-                }
+            } elseif (Test-Path $logPath) {
+                $logContent = Get-Content -Path $logPath -Raw -Encoding UTF8
                 $content = (@{ log = $logContent } | ConvertTo-Json -Compress)
             } else {
-                $content = (@{ log = "Nenhum log encontrado." } | ConvertTo-Json -Compress)
+                $content = (@{ log = "Arquivo de log nao especificado ou nao encontrado." } | ConvertTo-Json -Compress)
             }
-
             $contentType = "application/json; charset=utf-8"
         }
         # ROTA: Diagnostico de Cobertura (/api/coverage)
@@ -572,17 +920,117 @@ while ($listener.IsListening) {
         }
         # ROTA: Obter Diagrama Mermaid (/api/mermaid)
         elseif ($path -eq "/api/mermaid") {
-            $resolvedPath = Resolve-ExportPath -BasePath $selectedTiaPath -FallbackPath $exportRoot
-            $diagram = New-ProjectMermaid -ExportPath $resolvedPath
+            $effectiveVendor = Get-ProjectVendor -BasePath $selectedTiaPath -ConfiguredVendor $selectedVendor
+
+            if ($effectiveVendor -eq "rockwell") {
+                $rockwellSource = Resolve-RockwellSource -BasePath $selectedTiaPath
+                if ($rockwellSource.status -eq "success") {
+                    $diagram = New-RockwellMermaid -L5kPath $rockwellSource.path
+                } else {
+                    $diagram = "graph TD; ERROR[`"Erro: $($rockwellSource.message)`"];"
+                }
+            } else {
+                $resolvedPath = Resolve-ExportPath -BasePath $selectedTiaPath -FallbackPath $exportRoot
+                $diagram = New-ProjectMermaid -ExportPath $resolvedPath
+            }
             $content = (@{ diagram = $diagram } | ConvertTo-Json -Compress)
             $contentType = "application/json; charset=utf-8"
         }
         # ROTA: Obter Diagrama de Execucao (/api/execution-mermaid)
         elseif ($path -eq "/api/execution-mermaid") {
-            $resolvedPath = Resolve-ExportPath -BasePath $selectedTiaPath -FallbackPath $exportRoot
-            $diagram = New-ExecutionMermaid -ExportPath $resolvedPath
+            $effectiveVendor = Get-ProjectVendor -BasePath $selectedTiaPath -ConfiguredVendor $selectedVendor
+
+            if ($effectiveVendor -eq "rockwell") {
+                $rockwellSource = Resolve-RockwellSource -BasePath $selectedTiaPath
+                if ($rockwellSource.status -eq "success") {
+                    $diagram = New-RockwellMermaid -L5kPath $rockwellSource.path
+                } else {
+                    $diagram = "graph TD; ERROR[`"Erro: $($rockwellSource.message)`"];"
+                }
+            } else {
+                $resolvedPath = Resolve-ExportPath -BasePath $selectedTiaPath -FallbackPath $exportRoot
+                $diagram = New-ExecutionMermaid -ExportPath $resolvedPath
+            }
             $content = (@{ diagram = $diagram } | ConvertTo-Json -Compress)
             $contentType = "application/json; charset=utf-8"
+        }
+        # ROTA: Inicia o seletor de pastas para o projeto (assincrono).
+        elseif ($path -eq "/api/browse-project") {
+            # Dispara script dedicado em processo separado para abrir o dialogo no desktop do usuario.
+            $selectorScript = Join-Path $scriptRoot "Select-ProjectPath.ps1"
+            if (Test-Path $selectorScript) {
+                $args = @(
+                    "-NoProfile",
+                    "-ExecutionPolicy", "Bypass",
+                    "-File", $selectorScript,
+                    "-Port", $Port
+                )
+                Start-Process powershell -WorkingDirectory $scriptRoot -ArgumentList $args | Out-Null
+                $content = (@{ status = "pending"; message = "Dialogo de selecao de pasta iniciado." } | ConvertTo-Json -Compress)
+                $statusCode = 202 # Accepted
+            } else {
+                $content = (@{ status = "error"; message = "Select-ProjectPath.ps1 nao encontrado." } | ConvertTo-Json -Compress)
+                $statusCode = 500
+            }
+            $contentType = "application/json; charset=utf-8"
+        }
+        # ROTA: Inicia o seletor de pastas para importacao (assincrono).
+        elseif ($path -eq "/api/browse-import") {
+            # Dispara script dedicado em processo separado para abrir o dialogo no desktop do usuario.
+            $selectorScript = Join-Path $scriptRoot "Select-ImportPath.ps1"
+            if (Test-Path $selectorScript) {
+                $args = @(
+                    "-NoProfile",
+                    "-ExecutionPolicy", "Bypass",
+                    "-File", $selectorScript
+                )
+                Start-Process powershell -WorkingDirectory $scriptRoot -ArgumentList $args | Out-Null
+                $content = (@{ status = "pending"; message = "Dialogo de selecao de pasta iniciado." } | ConvertTo-Json -Compress)
+                $statusCode = 202 # Accepted
+            } else {
+                $content = (@{ status = "error"; message = "Select-ImportPath.ps1 nao encontrado." } | ConvertTo-Json -Compress)
+                $statusCode = 500
+            }
+            $contentType = "application/json; charset=utf-8"
+        }
+        # ROTA: Obtem o resultado do seletor de importacao e limpa o arquivo temporario.
+        elseif ($path -eq "/api/get-import-path") {
+            $tmpFile = Join-Path $scriptRoot "import_path.tmp"
+            if (Test-Path $tmpFile) {
+                # Se o arquivo temporario existe, le o caminho, apaga o arquivo e retorna sucesso.
+                try {
+                    $selectedPath = Get-Content -Path $tmpFile -Raw -Encoding UTF8
+                    Remove-Item -Path $tmpFile -Force -ErrorAction Stop
+                    $content = (@{ status = "success"; path = $selectedPath } | ConvertTo-Json -Compress)
+                } catch {
+                    $content = (@{ status = "error"; message = "Falha ao ler arquivo temporario." } | ConvertTo-Json -Compress)
+                }
+            } else {
+                # Se o arquivo nao existe, significa que o usuario ainda nao selecionou.
+                $content = (@{ status = "not_ready" } | ConvertTo-Json -Compress)
+            }
+            $contentType = "application/json; charset=utf-8"
+        }
+        # ROTA: Reinicia o proprio servidor web para aplicar alteracoes de codigo.
+        # ROTA: Reiniciar Servidor (/api/restart)
+        elseif ($path -eq "/api/restart") {
+            $content = (@{ status = "success"; message = "Reiniciando servidor..." } | ConvertTo-Json -Compress)
+            $contentType = "application/json; charset=utf-8"
+            
+            # Envia resposta antes de fechar
+            $buffer = [System.Text.Encoding]::UTF8.GetBytes($content)
+            $response.ContentLength64 = $buffer.Length
+            $response.ContentType = $contentType
+            $response.StatusCode = 200
+            $response.OutputStream.Write($buffer, 0, $buffer.Length)
+            $response.OutputStream.Close()
+            
+            # Inicia o script de startup (que mata este processo e sobe um novo)
+            $startScript = Join-Path $scriptRoot "Start-WebPanel.ps1"
+            Start-Process powershell -ArgumentList "-ExecutionPolicy Bypass -File `"$startScript`" -Port $Port"
+            
+            $listener.Stop()
+            exit
         }
         # ROTA: Nao Encontrado (404)
         else {

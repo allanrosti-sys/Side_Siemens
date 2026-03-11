@@ -18,11 +18,13 @@
 Logs/run_output*.txt
 Logs/run_error*.txt
 Logs/*_latest.txt
+Logs/run_log_*.txt
 
 # Exportacoes e artefatos gerados
 Logs/ControlModules_Export/
 Logs/NewBlocks/
 DocumentacaoDoProjeto.html
+DocumentacaoRockwell.html
 Release_v1.0/
 
 # VS/VSCode locais
@@ -52,6 +54,12 @@ tia-map/frontend/*.tsbuildinfo
 tia-map/backend/.pytest_cache/
 tia-map/backend/**/__pycache__/
 *.pyc
+tia-map/backend/uvicorn_*.log
+tia-map/frontend/vite_*.log
+
+# Artefatos de origem Rockwell de cliente (exemplos grandes)
+Logs/*.L5K
+Logs/*.L5X
 
 # Configuracao local do painel web
 Logs/web_settings.json

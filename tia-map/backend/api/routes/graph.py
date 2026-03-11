@@ -4,85 +4,91 @@ import json
 import os
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
-from core.pipeline import run_graph_pipeline
+from core.pipeline import detect_vendor, run_graph_pipeline
 
-router = APIRouter(prefix="/api", tags=["graph"])
+router = APIRouter(prefix='/api', tags=['graph'])
 
 
 def _load_path_from_web_settings(repo_root: Path) -> str:
-    settings_path = repo_root / "Logs" / "web_settings.json"
+    settings_path = repo_root / 'Logs' / 'web_settings.json'
     if not settings_path.exists():
-        return ""
+        return ''
     try:
-        raw = settings_path.read_text(encoding="utf-8").lstrip("\ufeff")
+        raw = settings_path.read_text(encoding='utf-8').lstrip('\ufeff')
         data = json.loads(raw)
-        return str(data.get("tiaPath", "")).strip()
+        return str(data.get('tiaPath', '')).strip()
     except Exception:
-        return ""
+        return ''
 
 
-def _resolve_export_root() -> tuple[Path | None, bool, bool]:
-    env_path = (os.getenv("TIA_MAP_DATA_PATH") or "").strip()
+def _contains_rockwell(candidate: Path) -> bool:
+    if candidate.is_file() and candidate.suffix.lower() in {'.l5x', '.l5k'}:
+        return True
+    if candidate.is_dir():
+        return any(candidate.rglob('*.l5x')) or any(candidate.rglob('*.l5k'))
+    return False
+
+
+def _contains_siemens_export(candidate: Path) -> bool:
+    if not candidate.exists() or not candidate.is_dir():
+        return False
+    return any(candidate.rglob('OB_*.xml')) or any(candidate.rglob('FB_*.xml')) or any(candidate.rglob('FC_*.xml'))
+
+
+def _pick_existing(candidates: list[Path], vendor: str) -> Path | None:
+    for candidate in candidates:
+        if not candidate.exists():
+            continue
+        resolved = candidate.resolve()
+        if vendor == 'rockwell' and _contains_rockwell(resolved):
+            return resolved
+        if vendor == 'siemens' and _contains_siemens_export(resolved):
+            return resolved
+        if vendor == 'auto' and (_contains_rockwell(resolved) or _contains_siemens_export(resolved)):
+            return resolved
+    return None
+
+
+def _resolve_graph_source(vendor: str) -> tuple[Path | None, bool, bool]:
+    env_path = (os.getenv('TIA_MAP_DATA_PATH') or '').strip()
     repo_root = Path(__file__).resolve().parents[4]
     settings_path = _load_path_from_web_settings(repo_root)
-
-    # Prioridade de origem: Web settings (painel) -> variavel de ambiente (launcher).
-    effective_path = settings_path or env_path
-
+    # Preferir fontes que combinem com o vendor, sem ignorar a origem de ambiente.
     preferred_candidates: list[Path] = []
-    if effective_path:
-        base = Path(effective_path)
+    base_paths = [p for p in [settings_path, env_path] if p]
+    for raw_path in base_paths:
+        base = Path(raw_path)
         preferred_candidates.extend([
-            base / "Logs" / "ControlModules_Export",
-            base / "ControlModules_Export",
+            base / 'Logs' / 'ControlModules_Export',
+            base / 'ControlModules_Export',
+            base / 'Export',
             base,
         ])
 
-    current_dir = Path.cwd()
-    backend_dir = Path(__file__).resolve().parents[2]
     fallback_candidates = [
-        current_dir / "Logs" / "ControlModules_Export",
-        backend_dir / "Logs" / "ControlModules_Export",
-        repo_root / "Logs" / "ControlModules_Export",
+        repo_root / 'Logs' / 'ControlModules_Export',
+        repo_root / 'ControlModules_Export',
+        repo_root / 'Export',
+        repo_root,
     ]
 
-    def pick(candidates: list[Path]) -> Path | None:
-        best_existing = None
-        for candidate in candidates:
-            if not candidate.exists():
-                continue
-            if best_existing is None:
-                best_existing = candidate.resolve()
-            block_count = len(
-                [
-                    f
-                    for f in candidate.rglob("*.xml")
-                    if f.stem.startswith("OB_") or f.stem.startswith("FB_") or f.stem.startswith("FC_")
-                ]
-            )
-            if block_count > 0:
-                return candidate.resolve()
-        return best_existing
-
-    resolved = pick(preferred_candidates) or pick(fallback_candidates)
+    resolved = _pick_existing(preferred_candidates, vendor) or _pick_existing(fallback_candidates, vendor)
     return resolved, bool(env_path), bool(settings_path)
 
 
-@router.get("/graph/{project_id}")
-def get_graph(project_id: str) -> dict:
-    """
-    Retorna o payload de grafo (nodes + edges) para o projeto solicitado.
-    A origem prioriza web_settings.json (UI) e depois TIA_MAP_DATA_PATH.
-    """
-    export_root, from_env, from_settings = _resolve_export_root()
-    if export_root is None:
-        raise HTTPException(status_code=404, detail="Pasta de exportacao nao encontrada.")
+@router.get('/graph/{project_id}')
+def get_graph(project_id: str, vendor: str = Query(default='auto', pattern='^(auto|siemens|rockwell)$')) -> dict:
+    """Retorna o payload de grafo padronizado, independente do vendor."""
+    graph_source, from_env, from_settings = _resolve_graph_source(vendor)
+    if graph_source is None:
+        raise HTTPException(status_code=404, detail='Origem de dados nao encontrada para o vendor solicitado.')
 
-    payload = run_graph_pipeline(export_root)
-    payload["projectId"] = project_id
-    payload["source"] = str(export_root)
-    payload["sourceFromEnv"] = from_env
-    payload["sourceFromSettings"] = from_settings
+    effective_vendor = detect_vendor(graph_source) if vendor == 'auto' else vendor
+    payload = run_graph_pipeline(graph_source, vendor=effective_vendor)
+    payload['projectId'] = project_id
+    payload['source'] = str(graph_source)
+    payload['sourceFromEnv'] = from_env
+    payload['sourceFromSettings'] = from_settings
     return payload

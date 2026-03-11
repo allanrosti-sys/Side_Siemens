@@ -1,290 +1,136 @@
-﻿# Documentação Completa - Projeto Tirol/Ipiranga TIA Portal v20
-## Ferramenta de Exportação de Módulos de Controle
+# Documentacao do Puchta PLC Insight
 
-**Líder do Projeto:** Allan Rostirolla  
-**Líder Técnico AI:** Gemini  
-**Data de Criação:** 27 de Fevereiro de 2026  
-**Status:** 🏁 CONCLUÍDO / ENTREGUE (v1.0)  
-**Última Atualização:** 20:15  
+## Resumo
 
----
+O projeto evoluiu de um painel focado em TIA Portal para uma plataforma de analise multi-vendor.
 
-## 📋 RESUMO EXECUTIVO
+Objetivo atual:
+- preparar a origem do projeto a partir da interface principal;
+- escolher o vendor antes da pasta ou arquivo;
+- manter um contrato unico de grafo para Siemens e Rockwell;
+- abrir o app web de analise com contexto coerente ao vendor escolhido.
 
-Este projeto implementa uma **ferramenta automática de exportação de blocos de controle** (OB, FB, FC) de projetos TIA Portal v20 para formato XML, facilitando versionamento, backup e regeneração de projetos.
+## Nome oficial
 
-### 🎯 Objetivo Principal
-Extrair todos os blocos de programa de um projeto TIA Portal S7-1500 e salvá-los individualmente em XML, permitindo:
-- ✅ Backup centralizado de código-fonte
-- ✅ Controle de versão
-- ✅ Portabilidade entre projetos
-- ✅ Análise e documentação automática
+- Nome atual do produto: `Puchta PLC Insight`
+- Nome legado: `TIA Map`
+- Uso recomendado em interface, documentacao e backlog: sempre `Puchta PLC Insight`
 
----
+## Fluxo principal da interface
 
-## 🏗️ ARQUITETURA DA SOLUÇÃO
+1. Escolher `Auto`, `Siemens` ou `Rockwell`.
+2. Informar a pasta raiz do projeto.
+3. Salvar a configuracao para persistir `vendor` e `tiaPath`.
+4. Executar as acoes disponiveis para a origem.
+5. Abrir o mapa completo no app React/FastAPI quando necessario.
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│         Projeto TIA Portal v20 (.ap20)                      │
-│         Arquivo: tirol-ipiranga-os18869_20260224_PE_V20     │
-└────────────────┬────────────────────────────────────────────┘
-                 │
-                 ▼
-┌─────────────────────────────────────────────────────────────┐
-│    TIA Openness API v20 (Siemens.Engineering.dll)           │
-│    • TiaPortal.GetProcesses()  → Conectar a instâncias      │
-│    • SoftwareContainer         → Acessar blocos             │
-│    • ICompilable.Compile()     → Compilação automática      │
-└────────────────┬────────────────────────────────────────────┘
-                 │
-                 ▼
-┌─────────────────────────────────────────────────────────────┐
-│  TiaProjectExporter_v20_FIXED.exe (C# Application)          │
-│  • Conecta ao Portal                                         │
-│  • Localiza PLC/CPU                                          │
-│  • Compila software (Rebuild All) para garantir consistência │
-│  • Exporta blocos recursivamente                             │
-└────────────────┬────────────────────────────────────────────┘
-                 │
-                 ▼
-┌─────────────────────────────────────────────────────────────┐
-│         Saída: ...\Logs\ControlModules_Export               │
-│         • OB_*.xml (Organization Blocks)                    │
-│         • FB_*.xml (Function Blocks)                        │
-│         • FC_*.xml (Functions)                              │
-│         Hierarquia de pastas respeitada                     │
-└─────────────────────────────────────────────────────────────┘
-```
+## Regras por vendor
 
----
+### Siemens
 
-## 🔧 COMPONENTES PRINCIPAIS
+- Terminologia principal: `OB`, `FB`, `FC`, `DB`
+- Origem suportada:
+  - raiz do projeto TIA;
+  - pasta com XMLs exportados;
+  - pasta contendo `Logs/ControlModules_Export`
+- Exportacao direta suportada pelo painel legado via scripts TIA.
 
-### 1. **Código Principal: `using Siemens.cs` (183 linhas)**
+### Rockwell
 
-**Propósito:** Conectar a uma instância TIA Portal aberta, compilar e exportar os blocos de programa. A lógica prioriza a conexão (Attach) para evitar o modo "Read-Only".
+- Terminologia principal: `Task`, `MainProgram`, `Routine`, `AOI`, `Tags/Data`
+- Origem suportada:
+  - pasta contendo um arquivo `.L5X`
+- O painel legado nao exporta projeto Rockwell; a analise parte de um `.L5X` previamente exportado.
 
-### 2. **Binário Oficial: `Logs\TiaProjectExporter_v20_FIXED.exe`**
+## Backend
 
-**Status:** Funcional, mas compilado a partir de uma versão anterior do código-fonte. Aguardando patch para o `using Siemens.cs` para gerar a versão final.
+O backend novo em `tia-map/backend/core/` adota arquitetura multi-vendor:
 
-### 3. **Script Oficial de Execução: `Logs\RunExporterWithAttach.ps1`**
+- `plc_parser.py`: contrato base de parser
+- `siemens_parser.py`: parser Siemens
+- `rockwell_parser.py`: parser Rockwell `.L5X`
+- `pipeline.py`: deteccao de vendor e execucao do pipeline
+- `builder.py`: montagem padronizada de nos e arestas
 
-**Propósito:** Orquestrar a exportação de forma simples e robusta.
-- Verifica se o TIA Portal está aberto.
-- Limpa a pasta de exportação anterior.
-- Executa o binário oficial.
-- Valida o resultado e informa o sucesso ou falha.
+O endpoint de grafo aceita:
 
-### 4. **Monitor em Loop: `Loop_Monitor_AISYNC.ps1`**
+- `vendor=auto`
+- `vendor=siemens`
+- `vendor=rockwell`
 
-- **Propósito:** Monitorar continuamente `AI_SYNC.md` por mensagens
-- **Frequência:** 5 segundos de check
-- **Reação:** Exibe mudanças, detecta `[BLOCKER]`, `[USER_ACTION_REQUIRED]`, `[OK]`
+## Painel legado
 
----
+O painel legado em `Logs/` continua sendo o ponto de entrada operacional rapido.
 
-## ⚙️ CONFIGURAÇÃO DE AMBIENTE (Web Manager)
+Responsabilidades atuais:
+- persistir `tiaPath` e `vendor` em `Logs/web_settings.json`;
+- exibir a escolha de vendor antes da pasta;
+- ajustar labels e legenda conforme o vendor efetivo;
+- chamar scripts auxiliares;
+- abrir Mermaid estrutural e de execucao.
 
-Para que as ferramentas de visualização (Mapas e TIA Map) funcionem corretamente, o sistema precisa saber onde estão os arquivos do projeto.
+## Cores padrao
 
-1. **Definir Origem:** No topo do Web Manager, cole o caminho da pasta onde está o seu projeto `.ap20`.
-2. **Salvar:** Clique em "Definir Origem". O sistema buscará automaticamente a pasta `Logs\ControlModules_Export` dentro desse caminho.
-3. **Verificação:** O painel mostrará quantos arquivos XML foram encontrados. Se for 0, execute a **Exportação (Botão 1)**.
+### Siemens
 
----
+- `OB`: roxo
+- `FB`: azul
+- `FC`: verde
+- `DB / Dados`: cinza
 
-## ⚙️ FLUXO DE EXECUÇÃO COMPLETO
+### Rockwell
 
-O fluxo foi simplificado para máxima robustez e mínima intervenção do usuário.
+- `MainProgram`: vermelho
+- `Routine`: verde
+- `AOI`: azul
+- `Tags / Data`: cinza
 
-### **Passo 1: Abrir o Projeto no TIA Portal**
-Abra o TIA Portal e carregue o projeto `tirol-ipiranga-os18869_20260224_PE_V20.ap20` manualmente. **Esta etapa é crucial** para garantir que o projeto seja aberto em modo de escrita.
+## Governanca
 
-### **Passo 2: Executar o Script de Exportação**
-Execute o script oficial em um terminal PowerShell.
-```powershell
-C:\Users\Administrador\Documents\tirol-ipiranga-os18869_20260224_PE_V20\Logs\RunExporterWithAttach.ps1
-```
+- Registro oficial de mudancas: `Logs/AI_SYNC.md`
+- Quadro oficial de tarefas: `Logs/AI_TASK_BOARD.md`
+- Toda alteracao relevante deve registrar:
+  - escopo;
+  - arquivos alterados;
+  - validacao executada;
+  - resultado;
+  - proximo passo.
 
-O script irá se conectar à instância aberta, executar o exportador e salvar os arquivos.
+## Guia de Uso da Interface Web
 
-### **Passo 3: Validar a Saída**
-Verifique a pasta `Logs\ControlModules_Export`. Ela deve conter os arquivos XML correspondentes aos blocos do projeto. O próprio script já faz uma contagem e validação inicial.
+O painel de operação web (`Puchta PLC Insight`) foi projetado para ser intuitivo. Siga os passos abaixo para analisar seus projetos.
 
----
+### 1. Configuração de Origem
 
-## 🔴 BLOQUEADORES IDENTIFICADOS & RESOLUÇÕES
+Esta é a etapa mais importante. Aqui você define qual projeto e de qual fabricante será analisado.
 
-### **Bloqueador 1: Projeto em Modo "Read-Only"**
+1.  **Escolha o Fabricante (Vendor):** No primeiro menu, selecione `Siemens`, `Rockwell`, ou `Auto detectar`. A interface se adaptará à sua escolha.
+2.  **Selecione a Pasta do Projeto:**
+    *   Clique no botão **"Procurar..."**. Uma janela do sistema operacional será aberta.
+    *   Navegue até a pasta raiz do seu projeto (a que contém o `.ap20` para Siemens ou o `.L5X` para Rockwell) e clique em "OK".
+    *   **Importante:** Após a seleção, a interface irá detectar automaticamente a sua escolha e preencher o campo de texto com o caminho selecionado. Aguarde um instante para que o caminho apareça.
+3.  **Salve e Valide:** Com o caminho preenchido, clique em **"Salvar e validar"**. O sistema irá verificar a pasta, confirmar o tipo de projeto e habilitar as ações no passo 2.
 
-**Sintoma:** Exportação falha com erro "not permitted in a read-only context".  
-**Causa Raiz:** A API Openness abre projetos via caminho de arquivo em modo somente leitura.  
-**Solução:**
-1. Abrir o projeto manualmente na interface gráfica do TIA Portal.
-2. Usar um script que se conecta (Attach) à instância já aberta.
+### 2. Ações do Projeto
 
-**Status:** ✅ RESOLVIDO com o fluxo de trabalho atual (`RunExporterWithAttach.ps1`).
+Uma vez que a origem está configurada, as seguintes ações ficam disponíveis:
 
-### **Bloqueador 2: Múltiplas Instâncias do TIA Portal**
+-   **Exportar XML (Siemens):** Inicia o processo de backup dos blocos do projeto TIA Portal em formato XML. Necessário para as análises.
+-   **Mapa Estrutural / Fluxo de Execução:** Estes botões abrem um visualizador de diagrama (`Mermaid`).
+    -   **Interatividade:** Os diagramas são totalmente interativos. Você pode usar o **scroll do mouse para dar zoom** e **clicar e arrastar para mover (pan)** o diagrama, facilitando a navegação em projetos grandes.
+-   **Abrir Puchta PLC Insight:** Inicia a aplicação de análise visual completa para uma exploração aprofundada do projeto.
+-   **Importar Blocos / Documentação HTML:** Funções auxiliares para gerenciamento do projeto.
 
-**Sintoma:** A ferramenta de exportação conecta-se a uma instância "fantasma" ou errada, resultando em falha.  
-**Causa Raiz:** Processos do TIA Portal que não foram fechados corretamente.  
-**Solução:**
-1. O código C# foi aprimorado para procurar a instância que contém o projeto alvo aberto.
-2. Manter apenas a instância de trabalho do TIA Portal aberta.
+### 3. Solução de Problemas Comuns
 
-**Status:** ✅ RESOLVIDO.
+-   **O caminho não atualiza após selecionar a pasta:** Garanta que você clicou em "OK" na janela de seleção. A interface irá detectar a mudança em poucos segundos. Se não detectar, usar o botão de reiniciar (↻) pode resolver problemas de cache do servidor.
+-   **Diagramas não abrem ou aparecem em branco:** O painel "Logs de execução" é seu principal aliado. Ele é limpo a cada nova ação e atualiza automaticamente por alguns segundos, mostrando o progresso. Verifique-o para mensagens de erro.
+-   **Diagrama Rockwell mostra erro de ".L5X não encontrado":** Isso significa que a pasta que você selecionou como "Origem" não contém um arquivo `.L5X` diretamente ou em um subdiretório. Verifique se a pasta está correta ou exporte o arquivo `.L5X` do Studio 5000 novamente.
+-   **Ações parecem não funcionar:** Se os botões não responderem ou o log não atualizar, a primeira medida é sempre reiniciar o servidor web clicando no botão (↻) na interface.
 
-### **Bloqueador 4: Checksum Inconsistency (V19→V20)**
+## Estado atual
 
-**Sintoma:** Alguns blocos não exportáveis pós-migração  
-**Causa Raiz:** Mismatch de formato entre versões  
-**Solução:** Compile (Rebuild All) antes de export  
-```csharp
-ICompilable compilable = plcSoftware as ICompilable;
-CompilerResult result = compilable.Compile();
-// Estado: Success/Warning/Error (continuar mesmo com error)
-```
-
-**Status:** ✅ IMPLEMENTADO
-
----
-
-## 📊 RESULTADOS FINAIS
-
-### **Execução de 27/02/2026 17:10 - CICLO COMPLETO**
-1. **Exportação:** Sucesso (XMLs gerados em `...\Logs\ControlModules_Export`)
-2. **Importação:** Sucesso (Blocos recriados no Projeto Alvo)
-3. **Integridade:** Estrutura de pastas e código preservados.
-
-### **Log de Referência (Sucesso)**
-
-```
-✅ SUCESSO - Exportação Completa
-
-Command Executed:
-  .\Logs\TiaProjectExporter_v20.exe `
-    .\tirol-ipiranga-os18869_20260224_PE_V20.ap20 `
-    .\Logs\ControlModules_Export
-
-Exit Code: 0 (Success)
-
-Output Location: C:\TiaExports\ControlModules
-
-XML Files Generated:
-  Total: [VALIDAR COM GET-CHILDITEM]
-  OBs: [COUNT]
-  FBs: [COUNT]
-  FCs: [COUNT]
-  
-Compilation Step: Executed, no critical errors
-Grant Access: Approved by user
-Blockers Resolved: All (Openness + Project Lock + Duplicates)
-```
-
----
-
-## 🤝 PROTOCOLO DE COLABORAÇÃO ENTRE IAs
-
-### **Participantes**
-- **Copilot:** Operacional (VS Code), executa scripts, diagnóstico
-- **Codex:** Orientação técnica, revisão de código
-- **Gemini:** Análise, verificação de execução, próximas fases
-
-### **Canal de Comunicação**
-- Arquivo Central: `Logs/AI_SYNC.md`
-- Frequência: Atualizações em tempo real
-- Monitor: PowerShell Job (5s de check)
-
-### **Protocolo Obrigatório**
-1. **Toda mudança** é registrada em AI_SYNC.md
-2. **Cada IA** explicita solicita updates das outras
-3. **Nenhuma modificação silenciosa** (no-silent-changes rule)
-4. **Formato de resposta:**
-   ```markdown
-   ### Response from [AI_NAME]:
-   - [STATUS] (OK/BLOCKER/USER_ACTION_REQUIRED)
-   - Detalhes da ação
-   - Próximos passos
-   ```
-
----
-
-## 📝 PRÓXIMAS FASES
-
-### **Fase 6: Importação de Blocos**
-- **Status:** ✅ CONCLUÍDO
-- **Responsável:** Gemini
-- **Resultado:** Ferramenta `TiaProjectImporter.cs` criada e validada.
-
-### **Fase 7: Documentação Automática (Em Execução)**
-- **Status:** 🚀 EM EXECUÇÃO
-- **Responsável:** Gemini
-- **Objetivo:** Gerar um relatório HTML a partir dos XMLs exportados.
-- **Componente:** `Logs/Generate-Documentation.ps1`
-- **Saída:** Arquivo `C:\TiaExports\DocumentacaoDoProjeto.html`
-- Listar dependências e interfaces
-- Criar diagrama de conectividade
-
-### **Fase 8: CI/CD Integration**
-- Versionamento automático no Git
-- Backup periódico
-- Deploy automation
-
----
-
-## 📚 REFERÊNCIAS & DOCUMENTAÇÃO
-
-### **Arquivos de Projeto**
-| Arquivo | Tipo | Linhas | Propósito |
-|---------|------|--------|----------|
-| `using Siemens.cs` | C# | 183 | Código principal exportador |
-| `TiaProjectExporter_v20.exe` | Executável | - | Build compilado |
-| `Cleanup_Portal_Instances.ps1` | PowerShell | 60 | Script v1 manual |
-| `Cleanup_Portal_Instances_v2.ps1` | PowerShell | 110 | Script v2 API-enhanced |
-| `Loop_Monitor_AISYNC.ps1` | PowerShell | 120 | Monitor contínuo |
-| `Generate-Documentation.ps1` | PowerShell | 143 | Gerador de Relatório HTML |
-| `AI_SYNC.md` | Markdown | 308 | Log de colaboração |
-| `AI_COLLAB_PROTOCOL.md` | Markdown | 35 | Regras de comunicação |
-
-### **Logs de Execução**
-- `run_output_after_prompt_attach.txt` - Saída attach mode
-- `run_output_after_prompt_noattach.txt` - Saída no-attach mode
-- `run_output_latest.txt` - Última execução
-
-### **Referências TIA Portal**
-- Siemens.Engineering API v20 (TiaPortal class)
-- PlcSoftware, PlcBlockGroup, PlcBlock (FB, FC, OB)
-- TiaPortal.GetProcesses(), GetInstances()
-- ICompilable.Compile()
-
----
-
-## ✅ CHECKLIST DE CONCLUSÃO
-
-- [x] Código C# compilado e validado
-- [x] Múltiplas instâncias Portal diagnosticadas
-- [x] Scripts de limpeza criados (v1 + v2)
-- [x] Bloqueador de Openness resolvido (grant access)
-- [x] Protocolo bidirecional estabelecido
-- [x] Documentação em português criada
-- [x] Exportação validada com contagem final de XMLs
-- [x] Fase de importação concluída
-
----
-
-## 📞 CONTATO & SUPORTE
-
-**Comunicação Ativa:** Monitor ativo em tempo real via `AI_SYNC.md`  
-**Tempo de Resposta:** <30 segundos (3 ciclos de monitor)  
-**Escalação:** Reportar em AI_SYNC.md com `[BLOCKER]` marker
-
----
-
-**Última Atualização:** 27 de Fevereiro de 2026, 20:15  
-**Versão Final:** 1.0
-
----
-*Aprovado por Allan Rostirolla.*
+- O backend novo suporta Siemens e Rockwell.
+- O painel legado ja permite selecionar o vendor antes da origem.
+- O nome visual principal foi migrado para `Puchta PLC Insight`.
+- O proximo passo natural e unificar ainda mais a experiencia entre o painel legado e o app `tia-map`.

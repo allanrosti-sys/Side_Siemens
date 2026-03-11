@@ -11,9 +11,9 @@
 Imagine que o projeto do PLC (o "cérebro" da máquina) é como um livro gigante escrito à mão. Se quisermos copiar uma página para outro livro, ou verificar se alguém mudou uma vírgula, é muito difícil fazer isso manualmente.
 
 Neste projeto, criamos **robôs de software** (scripts) que:
-1.  **Leem o livro (Exportação):** Entram no TIA Portal, leem todo o código e salvam cada bloco (FC, FB, OB) como um arquivo de texto separado (XML).
-2.  **Guardam no cofre (Git):** Salvam esses arquivos em um sistema seguro que registra quem mudou o quê e quando.
-3.  **Escrevem no livro (Importação):** Pegam arquivos de texto corrigidos ou novos e os escrevem de volta dentro do TIA Portal automaticamente.
+1. **Leem o livro (Exportação):** Entram no TIA Portal, leem todo o código e salvam cada bloco (FC, FB, OB) como um arquivo de texto separado (XML).
+2. **Guardam no cofre (Git):** Salvam esses arquivos em um sistema seguro que registra quem mudou o quê e quando.
+3. **Escrevem no livro (Importação):** Pegam arquivos de texto corrigidos ou novos e os escrevem de volta dentro do TIA Portal automaticamente.
 
 ## 2. Por que isso é importante?
 
@@ -33,12 +33,12 @@ Neste projeto, criamos **robôs de software** (scripts) que:
 
 ## 4. Como funciona o nosso fluxo?
 
-1.  **Você** abre o TIA Portal.
-2.  **Você** roda nosso script (`Run-Full-Cycle`).
-3.  **O Script** faz um backup do que está lá.
-4.  **O Script** pega os novos códigos que você escreveu no VS Code.
-5.  **O Script** injeta esses códigos no TIA Portal.
-6.  Tudo pronto!
+1. **Você** abre o TIA Portal.
+2. **Você** roda nosso script (`Run-Full-Cycle`).
+3. **O Script** faz um backup do que está lá.
+4. **O Script** pega os novos códigos que você escreveu no VS Code.
+5. **O Script** injeta esses códigos no TIA Portal.
+6. Tudo pronto!
 
 ---
 *Documentação aprovada por Allan Rostirolla.*
