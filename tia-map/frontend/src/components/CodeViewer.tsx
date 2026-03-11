@@ -56,6 +56,7 @@ function convertRockwellToSt(code: string): string {
     output.push(`// ${tag}: ${cleaned}`.trim());
   };
 
+  // Separa uma lista por virgulas ignorando virgulas dentro de parenteses.
   const splitByCommaTopLevel = (text: string): string[] => {
     const parts: string[] = [];
     let current = "";
@@ -75,6 +76,141 @@ function convertRockwellToSt(code: string): string {
     return parts;
   };
 
+  // Converte instrucoes Rockwell (forma texto) para pseudo-ST.
+  // Nota: isto nao e um compilador Ladder->ST. E um "melhor esforco" para leitura humana.
+  const convertInstruction = (text: string): string[] => {
+    const t = text.trim().replace(/;$/, "");
+    if (!t) return [];
+
+    // MOV(src, dst) => dst := src;
+    const mov = t.match(/^MOV\((.+?),\s*([^)]+)\)$/i);
+    if (mov) {
+      const src = mov[1].trim();
+      const dst = mov[2].trim();
+      return [`${dst} := ${src};`];
+    }
+
+    // Comparacao + chamada: LEQ(a,b)JSR(Rotina,0)
+    const cmpJsr = t.match(/^(LEQ|LES|GEQ|GRT|EQU|NEQ)\((.+?),\s*([^)]+)\)\s*JSR\(([^,]+),\s*([^)]+)\)$/i);
+    if (cmpJsr) {
+      const op = cmpJsr[1].toUpperCase();
+      const a = cmpJsr[2].trim();
+      const b = cmpJsr[3].trim();
+      const routine = cmpJsr[4].trim();
+      const param = cmpJsr[5].trim();
+
+      const stOpMap: Record<string, string> = {
+        LEQ: "<=",
+        LES: "<",
+        GEQ: ">=",
+        GRT: ">",
+        EQU: "=",
+        NEQ: "<>",
+      };
+      const stOp = stOpMap[op] || "<=";
+
+      return [
+        `IF ${a} ${stOp} ${b} THEN`,
+        `  ${routine}(); // JSR param: ${param}`,
+        "END_IF;",
+      ];
+    }
+
+    // JSR(Rotina,0) => Rotina();
+    const jsr = t.match(/^JSR\(([^,]+),\s*([^)]+)\)$/i);
+    if (jsr) {
+      const routine = jsr[1].trim();
+      const param = jsr[2].trim();
+      return [`${routine}(); // JSR param: ${param}`];
+    }
+
+    // Fallback: preserva a informacao como comentario.
+    return [`// Instrucao nao convertida: ${t}`];
+  };
+
+  // Em alguns parses o marcador chega como "// N:" em uma linha e a instrucao na proxima.
+  let pendingN = false;
+
+  const emitNContent = (contentRaw: string) => {
+    const content = contentRaw.trim().replace(/;$/, "");
+    if (!content) return;
+
+    const complex = content.match(
+      /^XIC\(([^)]+)\)\s*(\[(.*)\])?\s*(OTL|OTU|OTE)\(([^)]+)\)$/i,
+    );
+    if (complex) {
+      const condition = complex[1];
+      const branch = complex[3];
+      const coil = complex[4].toUpperCase();
+      const target = complex[5];
+
+      output.push(`IF ${condition} THEN`);
+      if (branch) {
+        output.push("  // Ramo paralelo:");
+        const parts = splitByCommaTopLevel(branch);
+        for (const part of parts) {
+          if (/^ONS\(/i.test(part)) {
+            output.push(`  // ${part}  (pulso de borda)`);
+          } else {
+            output.push(`  ${part};`);
+          }
+        }
+      }
+      if (coil === "OTL") {
+        output.push(`  ${target} := TRUE;`);
+      } else if (coil === "OTU") {
+        output.push(`  ${target} := FALSE;`);
+      } else {
+        output.push(`  ${target} := TRUE;`);
+      }
+      output.push("END_IF;");
+      return;
+    }
+
+    if (content.startsWith("[") && content.endsWith("]")) {
+      const inner = content.slice(1, -1);
+      inner.split(/\s*,\s*/).forEach((chunk) => {
+        if (chunk) output.push(`${chunk};`);
+      });
+      return;
+    }
+
+    const xicOtl = content.match(/XIC\(([^)]+)\)\s*OTL\(([^)]+)\)/i);
+    if (xicOtl) {
+      output.push(`IF ${xicOtl[1]} THEN`);
+      output.push(`  ${xicOtl[2]} := TRUE;`);
+      output.push("END_IF;");
+      return;
+    }
+
+    const xicOtu = content.match(/XIC\(([^)]+)\)\s*OTU\(([^)]+)\)/i);
+    if (xicOtu) {
+      output.push(`IF ${xicOtu[1]} THEN`);
+      output.push(`  ${xicOtu[2]} := FALSE;`);
+      output.push("END_IF;");
+      return;
+    }
+
+    const xic = content.match(/XIC\(([^)]+)\)\s*OTE\(([^)]+)\)/i);
+    if (xic) {
+      output.push(`IF ${xic[1]} THEN`);
+      output.push(`  ${xic[2]} := TRUE;`);
+      output.push("END_IF;");
+      return;
+    }
+
+    const xio = content.match(/XIO\(([^)]+)\)\s*OTE\(([^)]+)\)/i);
+    if (xio) {
+      output.push(`IF NOT ${xio[1]} THEN`);
+      output.push(`  ${xio[2]} := TRUE;`);
+      output.push("END_IF;");
+      return;
+    }
+
+    // Novos conversores (MOV/JSR/LEQ...JSR).
+    output.push(...convertInstruction(content));
+  };
+
   for (const rawLine of lines) {
     const line = rawLine.trim();
     if (!line) continue;
@@ -85,83 +221,29 @@ function convertRockwellToSt(code: string): string {
       continue;
     }
 
-    if (/^N:/i.test(line)) {
-      const content = line.replace(/^N:\s*/i, "").replace(/;$/, "");
+    // Tag N: pode vir como "N:" ou como comentario "// N:".
+    if (/^(N:|\/\/\s*N:)/i.test(line)) {
+      const content = line
+        .replace(/^N:\s*/i, "")
+        .replace(/^\/\/\s*N:\s*/i, "")
+        .replace(/;$/, "")
+        .trim();
+
       output.push("// N:");
 
-      const complex = content.match(
-        /^XIC\(([^)]+)\)\s*(\[(.*)\])?\s*(OTL|OTU|OTE)\(([^)]+)\)$/i,
-      );
-      if (complex) {
-        const condition = complex[1];
-        const branch = complex[3];
-        const coil = complex[4].toUpperCase();
-        const target = complex[5];
-
-        output.push(`IF ${condition} THEN`);
-        if (branch) {
-          output.push("  // Ramo paralelo:");
-          const parts = splitByCommaTopLevel(branch);
-          for (const part of parts) {
-            if (/^ONS\(/i.test(part)) {
-              output.push(`  // ${part}  (pulso de borda)`);
-            } else {
-              output.push(`  ${part};`);
-            }
-          }
-        }
-        if (coil === "OTL") {
-          output.push(`  ${target} := TRUE;`);
-        } else if (coil === "OTU") {
-          output.push(`  ${target} := FALSE;`);
-        } else {
-          output.push(`  ${target} := TRUE;`);
-        }
-        output.push("END_IF;");
-        continue;
+      if (content) {
+        emitNContent(content);
+        pendingN = false;
+      } else {
+        pendingN = true;
       }
+      continue;
+    }
 
-      if (content.startsWith("[") && content.endsWith("]")) {
-        const inner = content.slice(1, -1);
-        inner.split(/\s*,\s*/).forEach((chunk) => {
-          if (chunk) output.push(`${chunk};`);
-        });
-        continue;
-      }
-
-      const xicOtl = content.match(/XIC\(([^)]+)\)\s*OTL\(([^)]+)\)/i);
-      if (xicOtl) {
-        output.push(`IF ${xicOtl[1]} THEN`);
-        output.push(`  ${xicOtl[2]} := TRUE;`);
-        output.push("END_IF;");
-        continue;
-      }
-
-      const xicOtu = content.match(/XIC\(([^)]+)\)\s*OTU\(([^)]+)\)/i);
-      if (xicOtu) {
-        output.push(`IF ${xicOtu[1]} THEN`);
-        output.push(`  ${xicOtu[2]} := FALSE;`);
-        output.push("END_IF;");
-        continue;
-      }
-
-      const xic = content.match(/XIC\(([^)]+)\)\s*OTE\(([^)]+)\)/i);
-      if (xic) {
-        output.push(`IF ${xic[1]} THEN`);
-        output.push(`  ${xic[2]} := TRUE;`);
-        output.push("END_IF;");
-        continue;
-      }
-
-      const xio = content.match(/XIO\(([^)]+)\)\s*OTE\(([^)]+)\)/i);
-      if (xio) {
-        output.push(`IF NOT ${xio[1]} THEN`);
-        output.push(`  ${xio[2]} := TRUE;`);
-        output.push("END_IF;");
-        continue;
-      }
-
-      output.push(`${content};`);
+    // Linha logo apos "// N:".
+    if (pendingN) {
+      emitNContent(line);
+      pendingN = false;
       continue;
     }
 

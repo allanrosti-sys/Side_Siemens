@@ -200,3 +200,16 @@
   - `npm.cmd --prefix tia-map\\frontend run build` (build OK).
 - Proximo passo:
   - Gemini/Usuario: validar um FB/FC que antes abria como XML puro (apenas Interface) e confirmar que agora aparece como pseudo-SCL legivel.
+
+## 2026-03-11 17:55 Codex -> Usuario/Gemini
+- Escopo:
+  - Melhorar a conversao Rockwell (RC/N) para pseudo-ST quando o texto chega no formato `// N:` + instrucao na linha seguinte.
+- Correcoes aplicadas:
+  - `tia-map/frontend/src/components/CodeViewer.tsx`
+    - Suporte a marcadores `// N:` (alem de `N:`) com estado para consumir a proxima linha como instrucao.
+    - Conversoes adicionais: `MOV(a,b)` -> atribuicao, `LEQ/LES/GEQ/GRT/EQU/NEQ(...)JSR(...)` -> `IF ... THEN Routine(); END_IF;`, `JSR(...)` -> chamada.
+    - Mantem instrucoes nao suportadas como comentario (`// Instrucao nao convertida: ...`) para nao perder informacao.
+- Validacao executada:
+  - `npm.cmd --prefix tia-map\\frontend run build` (build OK).
+- Proximo passo:
+  - Usuario: abrir a rotina que aparece como `// N:` no painel lateral e confirmar que as linhas MOV/LEQ+JSR viraram pseudo-ST legivel.
